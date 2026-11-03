@@ -16,7 +16,7 @@
 1. A skater controller driven by physics, with simple, intuitive controls: steer, tuck, brake and jump. Momentum and gravity do the rest.
 2. Grinding on rails and ledges, with snap-on, balance and speed carried through.
 3. Crash rules that are readable and fair: landing angle, impact speed and collisions decide whether you bail.
-4. One open course with a main line, several alternate routes and at least three big skips.
+4. One open course with a main line, several alternate routes and at least three big skips, including step-up sequences (chained hops up ledges and stairs) that lead to shortcuts or big gaps.
 5. A run timer, splits at checkpoints, a personal-best ghost, and instant restart.
 6. A chase camera that keeps up at high speed and lets you read the slope ahead.
 
@@ -24,7 +24,8 @@
 - **Steer:** left stick / A-D. Turning sharper scrubs a little speed.
 - **Tuck:** hold a trigger / W for more speed and less steering.
 - **Brake:** hold a trigger / S to slow down.
-- **Jump:** hold to crouch, release to pop. A longer hold gives a bigger pop.
+- **Jump:** hold to crouch, release to pop. A longer hold gives a bigger pop. A quick tap is a small hop.
+- **Hop combos:** hops are cheap and quick on blades. Releasing jump just before you land pops again the moment you touch down, so hops chain. Well-timed hops up step-ups, curbs and off the tops of rollers are a core speedrun skill.
 - **Grind:** jump onto a rail or ledge and you lock on automatically. Jump again to leave it.
 - **Air:** steer to rotate and line up the landing. No trick buttons.
 - **Restart:** one button, any time.
