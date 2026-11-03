@@ -1,0 +1,106 @@
+# Builds the Windows game on every push to main or a claude/* branch and
+# publishes it as the "latest-build" GitHub release. The desktop launcher
+# (tools/launcher/launcher.ps1) downloads from that release.
+name: Windows build
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "src/**"
+      - "assets/**"
+      - "tests/**"
+      - "project.godot"
+      - "export_presets.cfg"
+      - "tools/launcher/**"
+      - ".github/workflows/windows-build.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: windows-build
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot and export templates
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-windows
+
+      - name: Install Godot and Windows export templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          mkdir -p ~/godot
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -sSL -o /tmp/godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -oq /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+          curl -sSL -o /tmp/templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dest=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$dest"
+          unzip -oqj /tmp/templates.tpz templates/version.txt templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe -d "$dest"
+          rm /tmp/templates.tpz /tmp/godot.zip
+
+      - name: Import project
+        run: ~/godot/godot --headless --import || true
+
+      - name: Unit tests
+        run: ~/godot/godot --headless --script res://tests/unit/skater/test_skate_math.gd
+
+      - name: Export Windows build
+        run: |
+          set -e
+          mkdir -p build/windows
+          ~/godot/godot --headless --export-release "Windows Desktop" build/windows/DownhillBladeJam.exe
+          test -s build/windows/DownhillBladeJam.exe
+          echo "${GITHUB_SHA::7} ${GITHUB_REF_NAME} $(date -u +%Y-%m-%dT%H:%MZ)" > build/windows/build-info.txt
+          (cd build/windows && zip -9 -q ../DownhillBladeJam-windows.zip DownhillBladeJam.exe build-info.txt)
+          cp tools/launcher/launcher.ps1 build/launcher.ps1
+          ls -la build
+
+      - name: Publish latest-build release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          notes="Automatic build of ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}. The desktop launcher installs this for you."
+          if gh release view latest-build >/dev/null 2>&1; then
+            gh release upload latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 --clobber
+            gh release edit latest-build --notes "$notes" --prerelease
+          else
+            gh release create latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 \
+              --title "Latest build" --notes "$notes" --prerelease --target "$GITHUB_SHA"
+          fi
+
+  launcher-smoke-test:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run installer and launcher without starting the game
+        shell: pwsh
+        env:
+          DBJ_NO_LAUNCH: "1"
+        run: |
+          cmd /c tools\launcher\Install-DownhillBladeJam.cmd
+          $root = Join-Path $env:LOCALAPPDATA 'DownhillBladeJam'
+          Get-ChildItem -Recurse $root | Select-Object FullName, Length
+          if (-not (Test-Path (Join-Path $root 'game\DownhillBladeJam.exe'))) { throw 'game exe missing' }
+          $lnk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Downhill Blade Jam.lnk'
+          if (-not (Test-Path $lnk)) { throw 'shortcut missing' }
+          Write-Host "Installed version: $(Get-Content (Join-Path $root 'installed-version.txt'))"
