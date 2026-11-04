@@ -21,6 +21,8 @@ $Headers   = @{ 'User-Agent' = 'DownhillBladeJam-Launcher'; 'Accept' = 'applicat
 
 $Host.UI.RawUI.WindowTitle = 'Downhill Blade Jam'
 New-Item -ItemType Directory -Force -Path $GameDir | Out-Null
+# Keep a log of the last launch so problems can be diagnosed.
+try { Start-Transcript -LiteralPath (Join-Path $Root 'launcher.log') -Force | Out-Null } catch {}
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 function Read-Installed {
@@ -71,9 +73,11 @@ try {
     }
 } catch {
     Write-Host "Couldn't update: $($_.Exception.Message)"
-    if (Test-Path $Exe) { Write-Host 'Starting the installed version instead.' ; Start-Sleep -Seconds 2 }
+    if (Test-Path $Exe) { Write-Host 'Starting the installed version instead.' ; Start-Sleep -Seconds 3 }
+    else { Read-Host 'Press Enter to close' }
 }
 
+try { Stop-Transcript | Out-Null } catch {}
 if ($env:DBJ_NO_LAUNCH -eq '1') { exit 0 }
 
 if (Test-Path $Exe) {
