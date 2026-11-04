@@ -607,3 +607,17 @@ The red fence on the wall contour warns about 15 m before the kill line.
 
 ## 3. Resolved Questions
 1. **Straight line slow and crashy?** Yes (Conner, 2026-11-04): "you should not be able to go straight down. This should be a hard game where you're forced to find creative lines." Keep the Straight-Line Test as a hard requirement; difficulty bias is toward demanding lines.
+
+---
+
+## 4. Build Notes: greybox v1 (2026-11-04)
+
+Built from `assets/data/course_copperline_mountain.json` (schema: `docs/course-data-schema.md`). Differences from the layout above, all tuning-level:
+
+- **Measured times (bot, new skater physics, no skips):** Blue ≈1:27, Teal ≈1:39, Rust ≈2:05. Rust is slow where the bot stalls on rough ground; re-check with a human.
+- **Blue Crown dogleg** crosses below the Long Groove exit (0, −1010) and traverses east to The Ramp at z −1035..−1095, because a late traverse launched riders sideways off the band.
+- **Island heights match their step-ups:** Lift Island +4 m (4 steps), Ore Island +4 m (crusher steps lead onto the Trestle, which now runs (−150, −730) → (−95, −885)). No 5 m drop-in on Lift Island.
+- **Ore strand** swings west earlier ((−200, −685)) so it clears the crusher steps, and ends at (−115, −912) to clear the Trestle landing.
+- **Landings are sloped** for the new physics (landing impact limit 11 m/s): Needle Drop 3 m face then a 33° landing; Dry Falls Huck 3 m knuckle then a 36 m, ≈29° landing face, no kicker (paint only); Stair Falls is three 3 m rolls instead of 4 m drops.
+- **Culvert** is an open slot sunk 12 m through the band (no pipe roof yet). **Teal Rapids** starts at (+55, −425) and the Teal Split 1 pad is at x +50, clear of the Lift step-ups.
+- **Not built yet:** Chapel bell, crew tags, audio cues, the rock-gap entry dressing for the Groove, the 12 m/s respawn speed (respawn is stopped and waits for input), grinding on the rails.

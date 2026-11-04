@@ -158,4 +158,8 @@ static func ellipse_outside(p: Vector2, c: Vector2, rx: float, rz: float, yaw: f
 	var r: float = sqrt(nx * nx + nz * nz)
 	if r < 0.0001:
 		return -minf(rx, rz)
-	return (r - 1.0) * d.length() / r
+	# First-order distance: (r - 1) divided by the gradient length of r.
+	var gx: float = nx / maxf(rx, 0.01)
+	var gz: float = nz / maxf(rz, 0.01)
+	var grad: float = sqrt(gx * gx + gz * gz) / r
+	return (r - 1.0) / maxf(grad, 0.0001)

@@ -65,7 +65,9 @@ jobs:
         run: ~/godot/godot --headless --import || true
 
       - name: Unit tests
-        run: ~/godot/godot --headless --script res://tests/unit/skater/test_skate_math.gd
+        run: |
+          ~/godot/godot --headless --script res://tests/unit/skater/test_skate_math.gd
+          ~/godot/godot --headless --script res://tests/unit/course/test_course_math.gd
 
       - name: Export Windows build
         run: |

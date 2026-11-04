@@ -130,7 +130,7 @@ func _build_gates(kit: CourseKit) -> void:
 		if String(g.get("kind", "split")) == "finish":
 			finish = Area3D.new()
 			add_child(finish)
-			finish.global_position = Vector3(axis, terrain.height_at(axis, z), z)
+			finish.position = Vector3(axis, terrain.height_at(axis, z), z)
 			var shape := BoxShape3D.new()
 			shape.size = Vector3(4000.0, 1200.0, 2.0)
 			var col := CollisionShape3D.new()
@@ -149,7 +149,7 @@ func _build_gates(kit: CourseKit) -> void:
 func _build_terrain_nodes() -> void:
 	var chunk: int = int(_data["terrain"]["grid"].get("chunk_cells", 32))
 	var palette: Dictionary = {
-		CourseTerrain.Surface.CONCRETE: Color(0.86, 0.84, 0.80),
+		CourseTerrain.Surface.CONCRETE: Color(0.74, 0.72, 0.68),
 		CourseTerrain.Surface.GRASS: Color(0.38, 0.55, 0.30),
 		CourseTerrain.Surface.GRAVEL: Color(0.56, 0.52, 0.48),
 		CourseTerrain.Surface.ROCK: Color(0.34, 0.33, 0.36),

@@ -12,7 +12,7 @@ var _materials: Dictionary = {}
 ## Colours by material kind. Shared colour language (§2.12): yellow = skip
 ## takeoff, red = hazard, green/white = checkpoint.
 var colors: Dictionary = {
-	"concrete": Color(0.86, 0.84, 0.80), "ledge": Color(0.78, 0.77, 0.74),
+	"concrete": Color(0.74, 0.72, 0.69), "ledge": Color(0.78, 0.77, 0.74),
 	"skip": Color(0.98, 0.82, 0.18), "hazard": Color(0.85, 0.22, 0.18),
 	"boulder": Color(0.42, 0.36, 0.35), "rock": Color(0.36, 0.36, 0.39),
 	"rail": Color(0.62, 0.66, 0.72), "wood": Color(0.45, 0.32, 0.22),
@@ -169,7 +169,7 @@ func cylinder(p: Vector2, radius: float, height: float, lift: float, kind: Strin
 	else:
 		node = Node3D.new()
 	add_child(node)
-	node.global_position = Vector3(p.x, y + height * 0.5, p.y)
+	node.position = Vector3(p.x, y + height * 0.5, p.y)
 	var mesh := CylinderMesh.new()
 	mesh.bottom_radius = radius
 	mesh.top_radius = radius if top_radius < 0.0 else top_radius
@@ -313,7 +313,7 @@ func _tree(p: Vector2, scale: float) -> void:
 	var g: Vector3 = ground(p, -0.3)
 	var body := StaticBody3D.new()
 	add_child(body)
-	body.global_position = g + Vector3(0, 3.0 * scale, 0)
+	body.position = g + Vector3(0, 3.0 * scale, 0)
 	var shape := CylinderShape3D.new()
 	shape.radius = 0.45 * scale
 	shape.height = 6.0 * scale
@@ -370,11 +370,11 @@ func _static_box(center: Vector3, basis: Basis, size: Vector3, kind: String, col
 	mi.material_override = _mat(kind)
 	if not collide:
 		add_child(mi)
-		mi.global_transform = Transform3D(basis, center)
+		mi.transform = Transform3D(basis, center)
 		return null
 	var body := StaticBody3D.new()
 	add_child(body)
-	body.global_transform = Transform3D(basis, center)
+	body.transform = Transform3D(basis, center)
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var col := CollisionShape3D.new()
