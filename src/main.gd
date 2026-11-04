@@ -6,6 +6,7 @@ extends Node3D
 ## first entry of assets/data/courses.json.
 
 const MENU_CONFIG: String = "res://assets/data/run_menu.json"
+const GHOST_CONFIG: String = "res://assets/data/ghost.json"
 
 var level: Node3D
 var course: CourseBuilder
@@ -33,6 +34,12 @@ var _finish_menu_timer: float = -1.0
 var _finish_prev_best: float = 0.0
 var _finish_pb: bool = false
 var _finish_prev_splits: Array[float] = []
+## The best-run ghost (design/quick-specs/best-run-ghost-2026-11-04.md).
+var ghost: GhostRider
+var _recording: GhostTrack
+var _ghost_time: float = 0.0
+var _ghost_enabled: bool = true
+var _pending_ghost: GhostTrack
 
 
 func _ready() -> void:
@@ -89,6 +96,8 @@ func _ready() -> void:
 		add_child(drag)
 		drag.slow_ground_changed.connect(func(n: String) -> void: hud.show_slow_ground(n))
 
+	_setup_ghost()
+
 	camera = ChaseCamera.new()
 	camera.target = skater
 	add_child(camera)
@@ -132,6 +141,12 @@ func _physics_process(dt: float) -> void:
 		running = true
 	if running:
 		run_time += dt
+		if _ghost_enabled:
+			_recording.record(run_time, skater.global_position, skater.visual_rotation(), skater.visual_pose())
+	if running or finished:
+		_ghost_time += dt
+	if ghost:
+		ghost.show_at(_ghost_time)
 	hud.show_run(run_time, skater.get_speed(), best_time)
 
 
@@ -162,6 +177,12 @@ func _on_respawned() -> void:
 		finished = false
 		_splits.clear()
 		_split_names.clear()
+		_ghost_time = 0.0
+		if _recording:
+			_recording.clear()
+		if ghost and _pending_ghost:
+			ghost.track = _pending_ghost
+			_pending_ghost = null
 		if course:
 			skater.set_spawn(_spawn_xform, level.get("spawn_facing"))
 			course.reset_progress()
@@ -199,6 +220,7 @@ func _on_finish(body: Node3D) -> void:
 		best_time = run_time
 		_best_splits = _splits.duplicate()
 		records.save_file()
+	_maybe_save_ghost()
 	print("FINISH ", Hud.format_time(run_time))
 	hud.flash(("NEW BEST  " if pb else "FINISH  ") + Hud.format_time(run_time), Color(0.4, 1, 0.5), _finish_menu_delay)
 	_finish_menu_timer = _finish_menu_delay
@@ -246,6 +268,44 @@ func open_menu(which: String) -> void:
 			menu.open_maps.call()
 		"finish":
 			_show_finish_menu()
+
+
+## Keeps this run as the ghost when it beats the saved ghost (or there is none
+## yet, e.g. a best set before ghosts existed). Judged on the ghost's own time
+## so the ghost is always the fastest recorded run.
+func _maybe_save_ghost() -> void:
+	if not _ghost_enabled or _recording.size() == 0:
+		return
+	var current: GhostTrack = _pending_ghost if _pending_ghost else (ghost.track if ghost else null)
+	if current and current.finish_time > 0.0 and run_time >= current.finish_time - RunRecords.TIE_EPSILON_S:
+		return
+	_recording.record(run_time, skater.global_position, skater.visual_rotation(), skater.visual_pose())
+	_recording.finish_time = run_time
+	_recording.save_file(_ghost_path())
+	# The new ghost rides from the next run on.
+	_pending_ghost = _recording
+	_recording = GhostTrack.new(_recording.sample_hz, Skater.POSE_SIZE, _recording.teleport_m)
+
+
+func _ghost_path() -> String:
+	return "user://ghosts/%s.ghost" % course_id.validate_filename()
+
+
+func _setup_ghost() -> void:
+	var cfg: Variant = JSON.parse_string(FileAccess.get_file_as_string(GHOST_CONFIG))
+	var c: Dictionary = cfg if cfg is Dictionary else {}
+	_ghost_enabled = bool(c.get("enabled", true))
+	var tp: float = float(c.get("teleport_m", 8.0))
+	_recording = GhostTrack.new(float(c.get("sample_hz", 30.0)), Skater.POSE_SIZE, tp)
+	if not _ghost_enabled:
+		return
+	var col: Array = c.get("color", [0.55, 0.8, 1.0, 0.4])
+	ghost = GhostRider.new()
+	ghost.name = "Ghost"
+	ghost.fade_s = float(c.get("fade_s", 0.6))
+	add_child(ghost)
+	ghost.setup(skater, Color(col[0], col[1], col[2], col[3]))
+	ghost.track = GhostTrack.load_file(_ghost_path(), Skater.POSE_SIZE, tp)
 
 
 func _build_environment() -> void:

@@ -1,0 +1,7 @@
+{
+ "enabled": true,
+ "sample_hz": 20,
+ "color": [0.55, 0.8, 1.0, 0.45],
+ "teleport_m": 8.0,
+ "fade_s": 0.6
+}

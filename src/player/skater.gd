@@ -422,6 +422,55 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	_animate_stride(dt)
 
 
+## Number of floats in [method visual_pose].
+const POSE_SIZE: int = 11
+
+
+## The body's on-screen rotation (whole figure, including crash tumbles), for
+## ghost recording.
+func visual_rotation() -> Quaternion:
+	return _visual.global_basis.get_rotation_quaternion()
+
+
+## The body's animated pose below the root, for ghost recording: body sway,
+## pitch and crouch, then each skate's position and turn (POSE_SIZE floats).
+func visual_pose() -> PackedFloat32Array:
+	var p := PackedFloat32Array([_body_pivot.position.x, _body_pivot.rotation.x, _body_pivot.scale.y])
+	for foot: Node3D in _feet:
+		p.append_array(PackedFloat32Array([foot.position.x, foot.position.y, foot.position.z, foot.rotation.y]))
+	return p
+
+
+## A copy of the skater's figure (same meshes) for a ghost, with every mesh
+## drawn in [param material].
+func make_visual_copy(material: Material) -> Node3D:
+	var copy: Node3D = _visual.duplicate()
+	copy.transform = Transform3D.IDENTITY
+	var stack: Array[Node] = [copy]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is MeshInstance3D:
+			(n as MeshInstance3D).material_override = material
+			(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		stack.append_array(n.get_children())
+	return copy
+
+
+## Poses a figure made by [method make_visual_copy] with a [method visual_pose].
+static func apply_visual_pose(visual: Node3D, pose: PackedFloat32Array) -> void:
+	if pose.size() < POSE_SIZE:
+		return
+	var body: Node3D = visual.get_node("Body")
+	body.position.x = pose[0]
+	body.rotation.x = pose[1]
+	body.scale.y = pose[2]
+	for i: int in 2:
+		var foot: Node3D = visual.get_node("Foot%d" % i)
+		var k: int = 3 + i * 4
+		foot.position = Vector3(pose[k], pose[k + 1], pose[k + 2])
+		foot.rotation.y = pose[k + 3]
+
+
 ## Strides: the pushing skate sweeps out to the side and back, then returns
 ## while the other one glides, and the body shifts over the gliding skate.
 func _animate_stride(dt: float) -> void:
@@ -470,6 +519,7 @@ func _build_body() -> void:
 	_visual.name = "Visual"
 	add_child(_visual)
 	_body_pivot = Node3D.new()
+	_body_pivot.name = "Body"
 	_body_pivot.position = Vector3(0, 0.25, 0)
 	_visual.add_child(_body_pivot)
 
@@ -507,6 +557,7 @@ func _build_body() -> void:
 
 	for side: float in [-0.14, 0.14]:
 		var foot := Node3D.new()
+		foot.name = "Foot%d" % _feet.size()
 		foot.position = Vector3(side, 0, 0)
 		_visual.add_child(foot)
 		_feet.append(foot)
