@@ -1,0 +1,2 @@
+Reviewed-Content-Hash: src/player/skater.gd 4973bb57d855278a8796ebf4b432b7bafe1aadd4
+Reviewed-Content-Hash: src/player/skater_tuning.gd a8fbcb5f4be972c133ea7d51c971c5dadefc2d52

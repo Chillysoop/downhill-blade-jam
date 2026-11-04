@@ -60,10 +60,10 @@ extends Resource
 ## T-stop deceleration (m/s²): the trailing skate dragged sideways behind the
 ## front one. Real T-stops manage about 0.3-0.4 g.
 @export var t_stop_decel: float = 3.4
-## Above this speed (m/s) the T-stop drags harder: weight goes onto the
-## trailing skate and its wheels slide instead of just scrubbing.
+## Above this speed (m/s) braking switches to the hard brake: the crosswise
+## skate goes in front, the weight sits back and its wheels slide.
 @export var hard_brake_speed: float = 6.0
-## Hard T-stop deceleration (m/s²) above hard_brake_speed, wheels sliding.
+## Hard brake deceleration (m/s²) above hard_brake_speed, wheels sliding.
 ## About 0.6 g.
 @export var hard_brake_decel: float = 6.0
 ## Share of steering available while hard braking.

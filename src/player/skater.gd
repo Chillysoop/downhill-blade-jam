@@ -3,8 +3,8 @@ extends CharacterBody3D
 ## The player: an inline skater driven by momentum and gravity.
 ##
 ## Controls (see InputSetup): steer (lean onto the edges and carve), forward
-## (stride when slow, tuck when fast), brake (a T-stop that drags harder at
-## speed), jump (hold to charge, release to pop). Movement rules live in
+## (stride when slow, tuck when fast), brake (a T-stop when slow; when fast
+## the crosswise skate goes in front and bites harder), jump (hold to charge, release to pop). Movement rules live in
 ## SkateMath; every number lives in [member tuning]. Implements
 ## design/game-brief.md "Core Mechanics" with real inline skating physics.
 
@@ -41,7 +41,8 @@ var ground_normal: Vector3 = Vector3.UP
 var tucking: bool = false
 ## True while holding forward at low speed: pushing stroke after stroke.
 var striding: bool = false
-## True while braking hard at speed (the T-stop's stronger, high-speed drag).
+## True while braking hard at speed: the front skate crosswise ahead of the
+## other one (the T-stop reversed), with the weight back.
 var sliding: bool = false
 ## True while braking: the T-stop, trailing skate dragged crosswise behind.
 var t_stopping: bool = false
@@ -370,8 +371,9 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	var body_lean: float = atan(a_lat / tuning.gravity) if state == State.GROUNDED else lean
 	_steer_smoothed = lerpf(_steer_smoothed, body_lean, 1.0 - exp(-12.0 * dt))
 	target = target * Basis(Vector3.FORWARD, _steer_smoothed)
-	# Every brake is a T-stop (Conner, 2026-11-04): the body keeps facing down
-	# the hill and only the trailing skate turns. Sink lower when it bites
+	# Braking never turns the body (Conner, 2026-11-04): it keeps facing down
+	# the hill and only one skate turns crosswise, behind when slow, in front
+	# when fast. Sink lower when it bites
 	# harder at speed.
 	_slide_vis = lerpf(_slide_vis, 1.0 if sliding else 0.0, 1.0 - exp(-10.0 * dt))
 	var cur: Quaternion = _visual.global_basis.get_rotation_quaternion()
@@ -383,7 +385,7 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	var crouch: float = maxf(maxf(jump_charge * 0.35, 0.3 if tucking else 0.0), _stomp * 0.4)
 	crouch = maxf(crouch, 0.15 * _slide_vis)
 	_body_pivot.scale.y = lerpf(_body_pivot.scale.y, 1.0 - crouch, 1.0 - exp(-12.0 * dt))
-	var pitch: float = -0.5 if tucking else (-0.25 if striding else (-0.15 if t_stopping else 0.0))
+	var pitch: float = -0.5 if tucking else (-0.25 if striding else (0.2 if t_stopping and sliding else (-0.15 if t_stopping else 0.0)))
 	_body_pivot.rotation.x = lerpf(_body_pivot.rotation.x, pitch, 1.0 - exp(-10.0 * dt))
 	_animate_stride(dt)
 
@@ -403,7 +405,13 @@ func _animate_stride(dt: float) -> void:
 		var amount: float = push if i == _stride_leg else 0.0
 		var target := Vector3(side * (0.14 + 0.32 * amount), 0.06 * amount, 0.28 * amount)
 		var yaw: float = -side * 0.5 * amount
-		if t_stopping:
+		if t_stopping and sliding:
+			# Hard brake at speed: the opposite of the T-stop. The right skate
+			# goes out in front turned crosswise and the left one rolls behind
+			# it, with the weight sitting back.
+			target = Vector3(0.05, 0.0, 0.1) if i == 0 else Vector3(0.02, 0.0, -0.34)
+			yaw = 0.0 if i == 0 else PI / 2.0
+		elif t_stopping:
 			# T-stop: left skate rolls forward, right skate trails behind it
 			# turned crosswise, dragging its wheels.
 			target = Vector3(-0.05, 0.0, -0.1) if i == 0 else Vector3(-0.02, 0.0, 0.34)

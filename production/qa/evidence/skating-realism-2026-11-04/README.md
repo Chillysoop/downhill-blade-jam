@@ -15,3 +15,4 @@ Run result: test slope finished by autopilot lane 0.3 in 19.4 s (was 14.5 s),
 top speed 91 km/h (was 109 km/h). Powerslide from 57 km/h to 10 km/h in ~3.5 s.
 Unit tests: `godot --headless --script res://tests/unit/skater/test_skate_math.gd` PASS.
 | tstop/shot_08.60.png, shot_09.53.png | T-stop at speed: every brake is now a T-stop, no powerslide body turn (Conner, 2026-11-04) |
+| hardbrake/shot_08.60.png | Hard brake at speed: crosswise skate in front, the T-stop reversed (Conner, 2026-11-04) |
