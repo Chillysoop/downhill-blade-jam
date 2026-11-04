@@ -6,6 +6,9 @@ extends Node
 ##   --telemetry            print time, position, speed and state twice a second
 ##   --shots=<t1,t2,...>    save screenshots at those times (seconds)
 ##   --shot-dir=<path>      where screenshots go (default user://shots)
+##   --hops-after=<s>       only start hopping after <s> seconds
+##   --brake-at=<s>         during autopilot, let go of forward and brake from <s> seconds
+##   --steer=<v>            during autopilot, hold this steer (-1..1) instead of lane keeping
 ##   --quit-after=<s>       quit after <s> seconds
 ##   --course=<path|test_slope>  load another course (read by main.gd)
 ##   --route=<name>         autopilot follows a named course route (tucks, steers)
@@ -50,8 +53,12 @@ func _ready() -> void:
 			var flat_h: Vector3 = (skater.heading * Vector3(1, 0, 1)).normalized()
 			var heading_err: float = flat_h.signed_angle_to(Vector3.FORWARD, Vector3.UP)
 			var steer: float = clampf(lateral_err * 0.08 * signf(right.x) - heading_err * 1.5, -1.0, 1.0)
+			if args.has("steer"):
+				steer = float(args["steer"])
 			var jump: bool = _jump_held > 0.0
-			return {"steer": steer, "forward": 1.0, "brake": 0.0, "jump": jump}
+			var braking: bool = args.has("brake-at") and _t >= float(args["brake-at"])
+			return {"steer": steer, "forward": 0.0 if braking else 1.0,
+				"brake": 1.0 if braking else 0.0, "jump": jump}
 	if args.has("route") and course != null:
 		_route = CourseMath.sample_spline(course.routes.get(String(args["route"]), []), 4.0)
 		skater.input_override = _route_input
@@ -106,14 +113,16 @@ func _physics_process(dt: float) -> void:
 	_t += dt
 	_jump_held = maxf(_jump_held - dt, 0.0)
 	var hop_every: float = float(args.get("hops", "0"))
-	if hop_every > 0.0 and _t >= _next_hop:
+	if hop_every > 0.0 and _t >= _next_hop and _t >= float(args.get("hops-after", "0")):
 		_jump_held = 0.08
 		_next_hop += hop_every
 	if args.has("telemetry") and _t >= _next_tel:
 		_next_tel += 0.5
 		var p: Vector3 = skater.global_position
-		print("t=%5.2f pos=(%6.1f,%6.1f,%7.1f) speed=%5.1f km/h state=%s" % [
-			_t, p.x, p.y, p.z, skater.get_speed() * 3.6, Skater.State.keys()[skater.state]])
+		var mode: String = "slide" if skater.sliding else ("tuck" if skater.tucking else ("stride" if skater.striding else ""))
+		print("t=%5.2f pos=(%6.1f,%6.1f,%7.1f) speed=%5.1f km/h state=%s lean=%3.0f %s" % [
+			_t, p.x, p.y, p.z, skater.get_speed() * 3.6, Skater.State.keys()[skater.state],
+			rad_to_deg(skater.lean), mode])
 	if not _shots.is_empty() and _t >= _shots[0]:
 		_shots.pop_front()
 		_save_shot()

@@ -2,9 +2,11 @@ class_name Skater
 extends CharacterBody3D
 ## The player: an inline skater driven by momentum and gravity.
 ##
-## Controls (see InputSetup): steer, forward (push when slow, tuck when fast),
-## brake, jump (hold to charge, release to pop). Movement rules live in
-## SkateMath; every number lives in [member tuning].
+## Controls (see InputSetup): steer (lean onto the edges and carve), forward
+## (stride when slow, tuck when fast), brake (heel brake when slow, powerslide
+## when fast), jump (hold to charge, release to pop). Movement rules live in
+## SkateMath; every number lives in [member tuning]. Implements
+## design/game-brief.md "Core Mechanics" with real inline skating physics.
 
 ## Emitted when the skater bails. [param reason] is shown to the player.
 signal crashed(reason: String)
@@ -34,6 +36,12 @@ var state: State = State.AIR
 var heading: Vector3 = Vector3.FORWARD
 var ground_normal: Vector3 = Vector3.UP
 var tucking: bool = false
+## True while holding forward at low speed: pushing stroke after stroke.
+var striding: bool = false
+## True while braking in a powerslide (skates turned sideways).
+var sliding: bool = false
+## Body lean onto the edges in radians, positive = leaning right.
+var lean: float = 0.0
 var jump_charge: float = 0.0
 var air_time: float = 0.0
 var crash_reason: String = ""
@@ -47,9 +55,15 @@ var _spawn: Transform3D = Transform3D.IDENTITY
 var _steer_smoothed: float = 0.0
 var _hop_buffer: float = 0.0
 var _buffered_charge: float = 0.0
+var _stride_phase: float = 0.0
+var _stride_leg: int = 0
+var _turn_rate: float = 0.0
+var _stomp: float = 0.0
+var _slide_vis: float = 0.0
 
 var _visual: Node3D
 var _body_pivot: Node3D
+var _feet: Array[Node3D] = []
 var _base_snap: float = 0.45
 
 
@@ -84,6 +98,11 @@ func respawn() -> void:
 	jump_charge = 0.0
 	_charging = false
 	_hop_buffer = 0.0
+	lean = 0.0
+	striding = false
+	sliding = false
+	_stride_phase = 0.0
+	_stomp = 0.0
 	auto_brake = false
 	waiting_for_start = true
 	crash_reason = ""
@@ -181,26 +200,46 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 
 	var speed: float = velocity.length()
 	var fwd_in: float = inp["forward"]
-	tucking = fwd_in > 0.1 and speed > t.push_max_speed
-	var rate: float = SkateMath.turn_rate(t, speed, tucking)
-	heading = heading.rotated(n, -float(inp["steer"]) * rate * dt).normalized()
+	var brake_in: float = inp["brake"]
+	var braking: bool = brake_in > 0.05
+	tucking = fwd_in > 0.1 and speed > t.tuck_speed and not braking
+	striding = fwd_in > 0.1 and not tucking and not braking
+	# Powerslide above powerslide_speed; keep sliding down to half of it so it
+	# doesn't flicker between brakes.
+	if not braking:
+		sliding = false
+	elif speed > t.powerslide_speed:
+		sliding = true
+	elif speed < t.powerslide_speed * 0.5:
+		sliding = false
+
+	# Lean onto the edges; the lean and the speed decide the carve.
+	var steer: float = float(inp["steer"]) * (t.powerslide_steer_mult if sliding else 1.0)
+	lean = SkateMath.step_lean(t, lean, steer, tucking, dt)
+	_turn_rate = SkateMath.carve_turn_rate(t, speed, lean)
+	heading = heading.rotated(n, -_turn_rate * dt).normalized()
 
 	# Gravity pulls along the slope; the surface cancels the rest.
 	velocity += SkateMath.project_on_plane(Vector3.DOWN * t.gravity, n) * dt
 	velocity = SkateMath.project_on_plane(velocity, n)
 
+	# Wheels roll along the skates and resist sliding sideways.
 	var right: Vector3 = heading.cross(n).normalized()
 	var v_f: float = velocity.dot(heading)
-	var v_l: float = velocity.dot(right)
-	var gripped: Vector2 = SkateMath.apply_grip(t, v_f, v_l, dt)
-	v_f = gripped.x
-	v_l = gripped.y
+	var v_l: float = SkateMath.apply_side_friction(t, velocity.dot(right), dt)
+	v_f = SkateMath.apply_carve_scrub(t, v_f, speed, _turn_rate, dt)
 
-	if fwd_in > 0.1 and v_f < t.push_max_speed:
-		v_f += t.push_accel * fwd_in * dt
-	var brake_in: float = inp["brake"]
-	if brake_in > 0.05:
-		v_f = move_toward(v_f, 0.0, t.brake_decel * brake_in * dt)
+	if striding:
+		v_f += SkateMath.stride_accel(t, maxf(v_f, 0.0), _stride_phase) * fwd_in * dt
+		_stride_phase += dt / t.stride_period
+		if _stride_phase >= 1.0:
+			_stride_phase -= 1.0
+			_stride_leg = 1 - _stride_leg
+	else:
+		_stride_phase = 0.0
+	if braking:
+		var decel: float = t.auto_brake_decel if auto_brake else SkateMath.brake_decel(t, speed, sliding)
+		v_f = move_toward(v_f, 0.0, decel * brake_in * dt)
 	v_f = SkateMath.apply_resistance(t, v_f, t.drag_tuck if tucking else t.drag, dt)
 
 	velocity = heading * v_f + right * v_l
@@ -209,6 +248,10 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 func _air_step(dt: float, inp: Dictionary) -> void:
 	var t: SkaterTuning = tuning
 	tucking = false
+	striding = false
+	sliding = false
+	_turn_rate = 0.0
+	lean = move_toward(lean, 0.0, deg_to_rad(t.lean_rate_deg) * dt)
 	velocity += Vector3.DOWN * t.gravity * dt
 	var sp: float = velocity.length()
 	if sp > 0.01:
@@ -253,12 +296,15 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 			if not verdict["ok"]:
 				_crash(verdict["reason"])
 				return
-			# Clean landing: keep the speed along the ground, line up with it.
-			var tang: Vector3 = SkateMath.project_on_plane(pre_vel, n)
-			var keep: float = 1.0 - 0.25 * float(verdict["angle_deg"]) / tuning.crash_land_angle_deg
-			velocity = tang * keep
-			if tang.length() > 1.0:
-				heading = tang.normalized()
+			# Clean landing: the knees soak up the impact and the rolling speed
+			# carries on. Feet straighten out small misalignments on touchdown;
+			# skates that land more crooked keep pointing where they point, and
+			# wheel grip scrubs off the sideways part.
+			velocity = SkateMath.landing_velocity(tuning, pre_vel, n)
+			heading = SkateMath.landing_heading(tuning, heading, velocity, n)
+			var impact: float = float(verdict["impact"])
+			_stomp = clampf((impact - tuning.landing_soft_impact)
+				/ maxf(tuning.crash_land_impact - tuning.landing_soft_impact, 0.01), 0.0, 1.0)
 			landed.emit(air_time)
 		ground_normal = n
 		_last_ground_normal = n
@@ -299,24 +345,54 @@ func _crash_step(dt: float) -> void:
 		respawn()
 
 
-func _update_visual(dt: float, inp: Dictionary) -> void:
+func _update_visual(dt: float, _inp: Dictionary) -> void:
 	var up: Vector3 = ground_normal if state == State.GROUNDED else Vector3.UP
 	var fwd: Vector3 = SkateMath.project_on_plane(heading, up)
 	if fwd.length() < 0.01:
 		return
 	var target := Basis.looking_at(fwd.normalized(), up)
-	_steer_smoothed = lerpf(_steer_smoothed, float(inp["steer"]), 1.0 - exp(-8.0 * dt))
-	var speed_k: float = clampf(velocity.length() / 15.0, 0.0, 1.0)
-	var lean: float = -_steer_smoothed * speed_k * 0.45
-	target = target * Basis(Vector3.FORWARD, -lean)
+	# Lean into the carve by the angle the turn really needs: atan(lateral g).
+	var a_lat: float = velocity.length() * _turn_rate
+	var body_lean: float = atan(a_lat / tuning.gravity) if state == State.GROUNDED else lean
+	_steer_smoothed = lerpf(_steer_smoothed, body_lean, 1.0 - exp(-12.0 * dt))
+	target = target * Basis(Vector3.FORWARD, _steer_smoothed)
+	# Powerslide: swing the skates across the line of travel and sit back.
+	_slide_vis = lerpf(_slide_vis, 1.0 if sliding else 0.0, 1.0 - exp(-10.0 * dt))
+	target = target * Basis(Vector3.UP, deg_to_rad(75.0) * _slide_vis) \
+		* Basis(Vector3.FORWARD, -0.3 * _slide_vis)
 	var cur: Quaternion = _visual.global_basis.get_rotation_quaternion()
 	var q: Quaternion = cur.slerp(target.get_rotation_quaternion(), 1.0 - exp(-14.0 * dt))
 	_visual.global_basis = Basis(q)
-	# Crouch while charging a jump, fold forward while tucking.
-	var crouch: float = maxf(jump_charge * 0.35, 0.3 if tucking else 0.0)
+	# Crouch while charging a jump, fold forward while tucking, sink on a
+	# stomped landing.
+	_stomp = move_toward(_stomp, 0.0, 2.5 * dt)
+	var crouch: float = maxf(maxf(jump_charge * 0.35, 0.3 if tucking else 0.0), _stomp * 0.4)
+	crouch = maxf(crouch, 0.15 * _slide_vis)
 	_body_pivot.scale.y = lerpf(_body_pivot.scale.y, 1.0 - crouch, 1.0 - exp(-12.0 * dt))
-	var pitch: float = -0.5 if tucking else 0.0
+	var pitch: float = -0.5 if tucking else (-0.25 if striding else 0.0)
 	_body_pivot.rotation.x = lerpf(_body_pivot.rotation.x, pitch, 1.0 - exp(-10.0 * dt))
+	_animate_stride(dt)
+
+
+## Strides: the pushing skate sweeps out to the side and back, then returns
+## while the other one glides, and the body shifts over the gliding skate.
+func _animate_stride(dt: float) -> void:
+	var share: float = tuning.stride_push_share
+	var push: float = 0.0
+	if striding:
+		var p: float = _stride_phase
+		push = sin(PI * p / share) if p < share else 0.0
+	var k: float = 1.0 - exp(-18.0 * dt)
+	for i: int in _feet.size():
+		var foot: Node3D = _feet[i]
+		var side: float = -1.0 if i == 0 else 1.0
+		var amount: float = push if i == _stride_leg else 0.0
+		var target := Vector3(side * (0.14 + 0.32 * amount), 0.06 * amount, 0.28 * amount)
+		foot.position = foot.position.lerp(target, k)
+		foot.rotation.y = lerpf(foot.rotation.y, -side * 0.5 * amount, k)
+	var glide_side: float = 1.0 if _stride_leg == 0 else -1.0
+	var sway: float = glide_side * 0.1 * push
+	_body_pivot.position.x = lerpf(_body_pivot.position.x, sway, k)
 
 
 func _build_body() -> void:
@@ -368,20 +444,24 @@ func _build_body() -> void:
 	_body_pivot.add_child(helmet)
 
 	for side: float in [-0.14, 0.14]:
+		var foot := Node3D.new()
+		foot.position = Vector3(side, 0, 0)
+		_visual.add_child(foot)
+		_feet.append(foot)
 		var leg := MeshInstance3D.new()
 		var lm := BoxMesh.new()
 		lm.size = Vector3(0.14, 0.3, 0.14)
 		leg.mesh = lm
 		leg.material_override = dark
-		leg.position = Vector3(side, 0.12, 0)
-		_visual.add_child(leg)
+		leg.position = Vector3(0, 0.12, 0)
+		foot.add_child(leg)
 		var skate := MeshInstance3D.new()
 		var sm := BoxMesh.new()
 		sm.size = Vector3(0.12, 0.1, 0.42)
 		skate.mesh = sm
 		skate.material_override = dark
-		skate.position = Vector3(side, 0.05, 0)
-		_visual.add_child(skate)
+		skate.position = Vector3(0, 0.05, 0)
+		foot.add_child(skate)
 
 
 func _mat(c: Color) -> StandardMaterial3D:
