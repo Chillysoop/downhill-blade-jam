@@ -36,7 +36,7 @@ func place(f: Dictionary) -> void:
 			var d: Vector2 = _heading(f, p)
 			var plane: Variant = f.get("plane", null)
 			ramp(p, p + d * float(f["length"]), -0.15, float(f["height"]), float(f["width"]), -1.0,
-				f.get("kind", "skip"), plane)
+				f.get("kind", "concrete"), plane)
 		"stairs":
 			stairs(f)
 		"deck":
