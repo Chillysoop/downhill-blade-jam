@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 [autoload]
 
 InputSetup="*res://src/core/input_setup.gd"
+Updater="*res://src/core/updater.gd"
 
 [display]
 

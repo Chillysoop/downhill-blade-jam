@@ -56,6 +56,11 @@ jobs:
           unzip -oqj /tmp/templates.tpz templates/version.txt templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe -d "$dest"
           rm /tmp/templates.tpz /tmp/godot.zip
 
+      - name: Stamp build id
+        run: |
+          sed -i "s/const SHA: String = \"dev\"/const SHA: String = \"${GITHUB_SHA::7}\"/" src/core/build_id.gd
+          grep SHA src/core/build_id.gd
+
       - name: Import project
         run: ~/godot/godot --headless --import || true
 
@@ -72,6 +77,7 @@ jobs:
           (cd build/windows && zip -9 -q ../DownhillBladeJam-windows.zip DownhillBladeJam.exe build-info.txt)
           cp tools/launcher/launcher.ps1 build/launcher.ps1
           cp tools/launcher/Install-DownhillBladeJam.cmd build/Install-DownhillBladeJam.cmd
+          echo "${GITHUB_SHA::7}" > build/build-id.txt
           ls -la build
 
       - name: Publish latest-build release
@@ -81,10 +87,10 @@ jobs:
           set -e
           notes="Automatic build of ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}. The desktop launcher installs this for you."
           if gh release view latest-build >/dev/null 2>&1; then
-            gh release upload latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd --clobber
+            gh release upload latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd build/build-id.txt --clobber
             gh release edit latest-build --notes "$notes" --prerelease
           else
-            gh release create latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd \
+            gh release create latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd build/build-id.txt \
               --title "Latest build" --notes "$notes" --prerelease --target "$GITHUB_SHA"
           fi
 

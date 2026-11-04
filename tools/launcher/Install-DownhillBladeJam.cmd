@@ -27,14 +27,15 @@ Remove-Item Env:\DBJ_NO_LAUNCH
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shell = New-Object -ComObject WScript.Shell
 $lnk = $shell.CreateShortcut((Join-Path $desktop 'Downhill Blade Jam.lnk'))
-$lnk.TargetPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$Launcher`""
-$lnk.WorkingDirectory = $Root
+# The game updates itself on start, so the shortcut opens it directly.
+$lnk.TargetPath = $Exe
+$lnk.Arguments = ''
+$lnk.WorkingDirectory = Split-Path $Exe
 $lnk.Description = 'Downhill Blade Jam (updates itself when launched)'
-if (Test-Path $Exe) { $lnk.IconLocation = "$Exe,0" }
+$lnk.IconLocation = "$Exe,0"
 $lnk.Save()
 
 Write-Host ''
 Write-Host 'Done! Use the "Downhill Blade Jam" shortcut on your Desktop.'
-Write-Host 'It checks for a newer build every time you open it.'
+Write-Host 'The game checks for a newer build every time you open it.'
 if ($env:CI -ne 'true') { Read-Host 'Press Enter to close' }
