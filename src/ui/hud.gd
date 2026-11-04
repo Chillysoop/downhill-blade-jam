@@ -25,6 +25,14 @@ func _ready() -> void:
 	hint.offset_bottom = -12.0
 	hint.text = "A/D steer   W push / tuck   S brake   Space hold+release jump (tap = hop)   R restart"
 	hint.modulate = Color(1, 1, 1, 0.75)
+	var build := _label(Vector2(0, 0), 14)
+	build.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	build.offset_left = -160.0
+	build.offset_right = -16.0
+	build.offset_top = 12.0
+	build.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	build.text = "build " + BuildId.SHA
+	build.modulate = Color(1, 1, 1, 0.5)
 
 
 ## Updates the timer and speed readouts.
