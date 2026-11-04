@@ -16,6 +16,7 @@ func _init() -> void:
 	test_teleport_snaps_instead_of_blending()
 	test_dict_round_trip_keeps_samples()
 	test_from_dict_rejects_bad_data()
+	test_older_pose_layout_is_padded()
 	print("GhostTrack tests: %s" % ("PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
@@ -90,10 +91,18 @@ func test_dict_round_trip_keeps_samples() -> void:
 func test_from_dict_rejects_bad_data() -> void:
 	var d: Dictionary = _track_line().to_dict()
 	check(GhostTrack.from_dict(null, POSE) == null, "null rejected")
-	check(GhostTrack.from_dict(d, POSE + 1) == null, "other pose layout rejected")
+	check(GhostTrack.from_dict(d, POSE - 1) == null, "newer pose layout rejected")
 	var wrong := d.duplicate()
 	wrong["version"] = 99
 	check(GhostTrack.from_dict(wrong, POSE) == null, "other version rejected")
 	var short := d.duplicate()
 	short["data"] = PackedFloat32Array([1, 2, 3])
 	check(GhostTrack.from_dict(short, POSE) == null, "ragged data rejected")
+
+
+func test_older_pose_layout_is_padded() -> void:
+	var back: GhostTrack = GhostTrack.from_dict(_track_line().to_dict(), POSE + 1)
+	check(back != null and back.size() == 11, "older layout loads with all samples")
+	var pose: PackedFloat32Array = back.sample_at(0.5)["pose"]
+	check(pose.size() == POSE + 1 and is_equal_approx(pose[0], 0.5) and pose[POSE] == 0.0, "old floats kept, new ones zero")
+	check(is_equal_approx((back.sample_at(0.5)["pos"] as Vector3).x, 5.0), "positions unaffected by padding")

@@ -1,5 +1,5 @@
-Reviewed-Content-Hash: src/core/ghost_track.gd b1261e42fa86207ddbc572fa8d6265ca1a595e2d
+Reviewed-Content-Hash: src/core/ghost_track.gd 9233e4bb89d93f715b5d3a68f3ea4052c10ba00c
 Reviewed-Content-Hash: src/player/ghost_rider.gd 02648204578c352003156f0bb9750a45b509a800
-Reviewed-Content-Hash: src/player/skater.gd cb9c9cd5a780a5bdda77104592fd648723df5eb9
+Reviewed-Content-Hash: src/player/skater.gd b06a999b81b86003d3ec4781ae9d8d4b3a77633a
 Reviewed-Content-Hash: src/main.gd cfc00f468126458edee665d5af17670f33789f8a
 Reviewed-Content-Hash: assets/data/ghost.json 6daedd51ac6941973b94c228a2673ddedce44e34
