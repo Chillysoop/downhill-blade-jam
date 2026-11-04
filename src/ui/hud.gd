@@ -7,6 +7,7 @@ var _speed_label: Label
 var _best_label: Label
 var _banner: Label
 var _banner_time: float = 0.0
+var _ground_label: Label
 
 
 func _ready() -> void:
@@ -18,6 +19,14 @@ func _ready() -> void:
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_banner.offset_top = 160.0
 	_banner.offset_bottom = 240.0
+	_ground_label = _label(Vector2(0, 0), 30)
+	_ground_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_ground_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ground_label.offset_left = -300.0
+	_ground_label.offset_right = 300.0
+	_ground_label.offset_top = -130.0
+	_ground_label.offset_bottom = -90.0
+	_ground_label.modulate = Color(1.0, 0.78, 0.35)
 	var hint := _label(Vector2(24, 0), 18)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	hint.offset_left = 24.0
@@ -40,6 +49,12 @@ func show_run(time_s: float, speed_ms: float, best_s: float) -> void:
 	_timer_label.text = format_time(time_s)
 	_speed_label.text = "%d km/h" % roundi(speed_ms * 3.6)
 	_best_label.text = "Best  " + (format_time(best_s) if best_s > 0.0 else "--:--.--")
+
+
+## Shows a "slow ground" warning while the skater rolls off the concrete;
+## pass "" to hide it.
+func show_slow_ground(surface_name: String) -> void:
+	_ground_label.text = "" if surface_name == "" else "%s  -  SLOW" % surface_name
 
 
 ## Shows a big centred message for [param seconds].

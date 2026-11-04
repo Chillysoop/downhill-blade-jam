@@ -148,27 +148,21 @@ func _build_gates(kit: CourseKit) -> void:
 
 func _build_terrain_nodes() -> void:
 	var chunk: int = int(_data["terrain"]["grid"].get("chunk_cells", 32))
-	var palette: Dictionary = {
-		CourseTerrain.Surface.CONCRETE: Color(0.74, 0.72, 0.68),
-		CourseTerrain.Surface.GRASS: Color(0.38, 0.55, 0.30),
-		CourseTerrain.Surface.GRAVEL: Color(0.56, 0.52, 0.48),
-		CourseTerrain.Surface.ROCK: Color(0.34, 0.33, 0.36),
+	# Surface weights per vertex (concrete, grass, gravel, rock); the shader
+	# gives each its own look and paints the concrete edge.
+	var weights: Dictionary = {
+		CourseTerrain.Surface.CONCRETE: Color(1, 0, 0, 0),
+		CourseTerrain.Surface.GRASS: Color(0, 1, 0, 0),
+		CourseTerrain.Surface.GRAVEL: Color(0, 0, 1, 0),
+		CourseTerrain.Surface.ROCK: Color(0, 0, 0, 1),
 	}
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.roughness = 0.95
-	mat.uv1_triplanar = true
-	mat.uv1_world_triplanar = true
-	mat.uv1_scale = Vector3(0.125, 0.125, 0.125)
-	mat.albedo_texture = joint_texture()
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://src/levels/course/terrain.gdshader")
 	var nx: int = terrain.nx
 	var nz: int = terrain.nz
 	lowest_y = INF
 	for h: float in terrain.heights:
 		lowest_y = minf(lowest_y, h)
-	var shade := FastNoiseLite.new()
-	shade.seed = 99
-	shade.frequency = 0.08
 	for cz: int in range(0, nz - 1, chunk):
 		for cx: int in range(0, nx - 1, chunk):
 			var ex: int = mini(cx + chunk, nx - 1)
@@ -190,9 +184,7 @@ func _build_terrain_nodes() -> void:
 					var hd: float = terrain.heights[mini(iz + 1, nz - 1) * nx + ix]
 					# z decreases with iz: d/dz = (hu - hd) / (2 cell).
 					normals.append(Vector3(hl - hr, 2.0 * terrain.cell, hd - hu).normalized())
-					var c: Color = palette[terrain.surfaces[i]]
-					var v: float = 1.0 + 0.06 * shade.get_noise_2d(x, z)
-					cols.append(Color(c.r * v, c.g * v, c.b * v))
+					cols.append(weights[terrain.surfaces[i]])
 			for iz: int in range(0, ez - cz):
 				for ix: int in range(0, ex - cx):
 					var a: int = iz * w + ix

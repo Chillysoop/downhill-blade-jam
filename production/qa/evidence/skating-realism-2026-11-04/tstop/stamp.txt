@@ -1,4 +1,4 @@
-Reviewed-Content-Hash: src/player/skater.gd 468402e2303c927d8b3d72e20f4cb749063ddaaf
-Reviewed-Content-Hash: src/player/skate_math.gd abebaad59365cbdf79e0468b93b18a3bae40b2f3
-Reviewed-Content-Hash: src/player/skater_tuning.gd 59555f0e17186528e746228b2051a56ad02dd430
-Reviewed-Content-Hash: tests/unit/skater/test_skate_math.gd ae4cb655b5d962cf3e3a048273ad8895cde10ed0
+Reviewed-Content-Hash: src/player/skater.gd 3bde75d2dc842d1d4398ddbd0ea9ea667d9d167f
+Reviewed-Content-Hash: src/player/skate_math.gd a5572d2f0267125aea4e75da392c815dc53c96ed
+Reviewed-Content-Hash: src/player/skater_tuning.gd 29cfd1a32a5afe4248577cd460c229d1299bf69c
+Reviewed-Content-Hash: tests/unit/skater/test_skate_math.gd cd9e1f79647ea0bb52d233310d56ee2c0903512f

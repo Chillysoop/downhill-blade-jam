@@ -3,8 +3,8 @@ extends CharacterBody3D
 ## The player: an inline skater driven by momentum and gravity.
 ##
 ## Controls (see InputSetup): steer (lean onto the edges and carve), forward
-## (stride when slow, tuck when fast), brake (T-stop when slow, powerslide
-## when fast), jump (hold to charge, release to pop). Movement rules live in
+## (stride when slow, tuck when fast), brake (a T-stop that drags harder at
+## speed), jump (hold to charge, release to pop). Movement rules live in
 ## SkateMath; every number lives in [member tuning]. Implements
 ## design/game-brief.md "Core Mechanics" with real inline skating physics.
 
@@ -41,9 +41,9 @@ var ground_normal: Vector3 = Vector3.UP
 var tucking: bool = false
 ## True while holding forward at low speed: pushing stroke after stroke.
 var striding: bool = false
-## True while braking in a powerslide (skates turned sideways).
+## True while braking hard at speed (the T-stop's stronger, high-speed drag).
 var sliding: bool = false
-## True while braking with a T-stop (trailing skate dragged sideways behind).
+## True while braking: the T-stop, trailing skate dragged crosswise behind.
 var t_stopping: bool = false
 ## Body lean onto the edges in radians, positive = leaning right.
 var lean: float = 0.0
@@ -216,18 +216,18 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var braking: bool = brake_in > 0.05
 	tucking = fwd_in > 0.1 and speed > t.tuck_speed and not braking
 	striding = fwd_in > 0.1 and not tucking and not braking
-	# Powerslide above powerslide_speed; keep sliding down to half of it so it
+	# Hard T-stop above hard_brake_speed; keep sliding down to half of it so it
 	# doesn't flicker between brakes.
 	if not braking:
 		sliding = false
-	elif speed > t.powerslide_speed:
+	elif speed > t.hard_brake_speed:
 		sliding = true
-	elif speed < t.powerslide_speed * 0.5:
+	elif speed < t.hard_brake_speed * 0.5:
 		sliding = false
 
 	# Lean onto the edges; the lean and the speed decide the carve.
-	t_stopping = braking and not sliding and speed > 0.3
-	var steer: float = float(inp["steer"]) * (t.powerslide_steer_mult if sliding else 1.0)
+	t_stopping = braking and speed > 0.3
+	var steer: float = float(inp["steer"]) * (t.hard_brake_steer_mult if sliding else 1.0)
 	lean = SkateMath.step_lean(t, lean, steer, tucking, dt)
 	_turn_rate = SkateMath.carve_turn_rate(t, speed, lean)
 	heading = heading.rotated(n, -_turn_rate * dt).normalized()
@@ -370,10 +370,10 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	var body_lean: float = atan(a_lat / tuning.gravity) if state == State.GROUNDED else lean
 	_steer_smoothed = lerpf(_steer_smoothed, body_lean, 1.0 - exp(-12.0 * dt))
 	target = target * Basis(Vector3.FORWARD, _steer_smoothed)
-	# Powerslide: swing the skates across the line of travel and sit back.
+	# Every brake is a T-stop (Conner, 2026-11-04): the body keeps facing down
+	# the hill and only the trailing skate turns. Sink lower when it bites
+	# harder at speed.
 	_slide_vis = lerpf(_slide_vis, 1.0 if sliding else 0.0, 1.0 - exp(-10.0 * dt))
-	target = target * Basis(Vector3.UP, deg_to_rad(75.0) * _slide_vis) \
-		* Basis(Vector3.FORWARD, -0.3 * _slide_vis)
 	var cur: Quaternion = _visual.global_basis.get_rotation_quaternion()
 	var q: Quaternion = cur.slerp(target.get_rotation_quaternion(), 1.0 - exp(-14.0 * dt))
 	_visual.global_basis = Basis(q)
@@ -406,7 +406,7 @@ func _animate_stride(dt: float) -> void:
 		if t_stopping:
 			# T-stop: left skate rolls forward, right skate trails behind it
 			# turned crosswise, dragging its wheels.
-			target = Vector3(-0.08, 0.0, -0.08) if i == 0 else Vector3(0.0, 0.0, 0.42)
+			target = Vector3(-0.05, 0.0, -0.1) if i == 0 else Vector3(-0.02, 0.0, 0.34)
 			yaw = 0.0 if i == 0 else PI / 2.0
 		foot.position = foot.position.lerp(target, k)
 		foot.rotation.y = lerpf(foot.rotation.y, yaw, k)

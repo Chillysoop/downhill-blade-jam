@@ -60,13 +60,14 @@ extends Resource
 ## T-stop deceleration (m/s²): the trailing skate dragged sideways behind the
 ## front one. Real T-stops manage about 0.3-0.4 g.
 @export var t_stop_decel: float = 3.4
-## Above this speed (m/s) braking is a powerslide instead of a T-stop.
-@export var powerslide_speed: float = 6.0
-## Powerslide deceleration (m/s²): skates turned sideways, wheels sliding.
+## Above this speed (m/s) the T-stop drags harder: weight goes onto the
+## trailing skate and its wheels slide instead of just scrubbing.
+@export var hard_brake_speed: float = 6.0
+## Hard T-stop deceleration (m/s²) above hard_brake_speed, wheels sliding.
 ## About 0.6 g.
-@export var powerslide_decel: float = 6.0
-## Share of steering available while powersliding.
-@export var powerslide_steer_mult: float = 0.3
+@export var hard_brake_decel: float = 6.0
+## Share of steering available while hard braking.
+@export var hard_brake_steer_mult: float = 0.3
 ## Braking after crossing the finish (not player braking), m/s². A game value
 ## so runs stop before the end wall.
 @export var auto_brake_decel: float = 12.0
