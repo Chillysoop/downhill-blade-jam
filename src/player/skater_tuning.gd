@@ -11,6 +11,10 @@ extends Resource
 @export_group("World")
 ## Gravity in m/s². Real Earth gravity.
 @export var gravity: float = 9.81
+## A floor normal that jumps more than this (degrees) from the ground the
+## skater was just rolling on, within one physics step, is a collision seam
+## or box corner and is ignored. Real slope breaks on the courses are smaller.
+@export var max_normal_jump_deg: float = 30.0
 
 @export_group("Rolling")
 ## Rolling resistance as a fraction of gravity. Urethane wheels on smooth
@@ -25,6 +29,11 @@ extends Resource
 @export var air_drag: float = 0.0041
 ## Holding forward below this speed (m/s) strides; above it, it tucks.
 @export var tuck_speed: float = 7.5
+## Seconds to fold all the way down into a tuck.
+@export var tuck_in_time: float = 0.3
+## Seconds to stand back up out of a full tuck. Until you are up you have
+## less lean available, so tucking into a hard turn costs you.
+@export var tuck_out_time: float = 0.5
 
 @export_group("Striding")
 ## Seconds per push stroke (one leg). Real recreational cadence is ~0.6-0.8 s.
@@ -39,8 +48,9 @@ extends Resource
 
 @export_group("Carving")
 ## Steepest lean onto the edges (degrees) at full steer. A balanced carve
-## turns with lateral g = tan(lean), so 45° is a 1 g carve.
-@export var lean_max_deg: float = 45.0
+## turns with lateral g = tan(lean), so 46° is a 1.04 g carve: just inside
+## the wheels' grip when slow, just past it at high speed.
+@export var lean_max_deg: float = 46.0
 ## Steepest lean while tucked; a tuck only allows gentle carves.
 @export var lean_max_tuck_deg: float = 22.0
 ## How fast the body rolls onto its edges, degrees per second.
@@ -48,6 +58,15 @@ extends Resource
 ## Sideways grip of the wheels as a friction coefficient (urethane: ~0.9-1.1).
 ## Asking for more turn than this makes the skates slide.
 @export var side_grip: float = 1.05
+## Above this speed (m/s) the wheels start to lose grip (chatter and
+## vibration), so a full-lock carve at speed washes wide. About 43 km/h.
+@export var grip_fade_start: float = 12.0
+## Share of grip lost by grip_fade_end.
+@export var grip_fade: float = 0.15
+## Speed (m/s) at which grip_fade is fully applied. About 108 km/h.
+@export var grip_fade_end: float = 30.0
+## Sideways slide (m/s) above which the skates count as sliding, not rolling.
+@export var slip_threshold: float = 0.3
 ## Speed lost to wheel scrub while carving, as a share of the lateral g.
 ## Sharper turns cost more speed.
 @export var carve_scrub: float = 0.04
@@ -107,8 +126,9 @@ extends Resource
 ## Landing with the skates this far (degrees) off the travel direction is a bail.
 @export var crash_land_angle_deg: float = 60.0
 ## Hitting the ground faster than this (m/s, into the surface) is a bail.
-## 11 m/s is a ~6 m drop to flat, about the most legs and pads can take.
-@export var crash_land_impact: float = 11.0
+## 12.5 m/s is a ~8 m drop to flat, about the most legs and pads can take
+## when rolling out of it.
+@export var crash_land_impact: float = 12.5
 ## Hitting a wall or obstacle faster than this (m/s, head-on part) is a bail.
 @export var crash_wall_speed: float = 9.0
 ## Seconds spent tumbling before respawning.

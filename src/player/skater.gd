@@ -39,6 +39,13 @@ var state: State = State.AIR
 var heading: Vector3 = Vector3.FORWARD
 var ground_normal: Vector3 = Vector3.UP
 var tucking: bool = false
+## How far into a tuck the body is, 0 (upright) to 1 (full tuck). Drag and
+## the lean available follow this, so standing up takes time.
+var tuck_amount: float = 0.0
+## Share of the wheels' grip the current carve uses; 1 or more is sliding.
+var grip_usage: float = 0.0
+## Sideways slide speed of the skates (m/s); above slip_threshold they wash.
+var slip_speed: float = 0.0
 ## True while holding forward at low speed: pushing stroke after stroke.
 var striding: bool = false
 ## True while braking hard at speed: the front skate crosswise ahead of the
@@ -66,6 +73,7 @@ var _stride_leg: int = 0
 var _turn_rate: float = 0.0
 var _stomp: float = 0.0
 var _slide_vis: float = 0.0
+var _wobble_t: float = 0.0
 
 var _visual: Node3D
 var _body_pivot: Node3D
@@ -84,6 +92,10 @@ func _ready() -> void:
 	slide_on_ceiling = false
 	max_slides = 6
 	_build_body()
+	var audio := SkateAudio.new()
+	audio.name = "SkateAudio"
+	audio.skater = self
+	add_child(audio)
 	_spawn = global_transform
 
 
@@ -108,6 +120,9 @@ func respawn() -> void:
 	striding = false
 	sliding = false
 	t_stopping = false
+	tuck_amount = 0.0
+	grip_usage = 0.0
+	slip_speed = 0.0
 	_stride_phase = 0.0
 	_stomp = 0.0
 	auto_brake = false
@@ -216,7 +231,8 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var brake_in: float = inp["brake"]
 	var braking: bool = brake_in > 0.05
 	tucking = fwd_in > 0.1 and speed > t.tuck_speed and not braking
-	striding = fwd_in > 0.1 and not tucking and not braking
+	tuck_amount = SkateMath.step_tuck(t, tuck_amount, tucking, dt)
+	striding = fwd_in > 0.1 and not tucking and not braking and tuck_amount < 0.3
 	# Hard T-stop above hard_brake_speed; keep sliding down to half of it so it
 	# doesn't flicker between brakes.
 	if not braking:
@@ -229,7 +245,7 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	# Lean onto the edges; the lean and the speed decide the carve.
 	t_stopping = braking and speed > 0.3
 	var steer: float = float(inp["steer"]) * (t.hard_brake_steer_mult if sliding else 1.0)
-	lean = SkateMath.step_lean(t, lean, steer, tucking, dt)
+	lean = SkateMath.step_lean(t, lean, steer, tuck_amount, dt)
 	_turn_rate = SkateMath.carve_turn_rate(t, speed, lean)
 	heading = heading.rotated(n, -_turn_rate * dt).normalized()
 
@@ -240,7 +256,9 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	# Wheels roll along the skates and resist sliding sideways.
 	var right: Vector3 = heading.cross(n).normalized()
 	var v_f: float = velocity.dot(heading)
-	var v_l: float = SkateMath.apply_side_friction(t, velocity.dot(right), dt)
+	var v_l: float = SkateMath.apply_side_friction(t, velocity.dot(right), speed, dt)
+	slip_speed = absf(v_l)
+	grip_usage = SkateMath.grip_usage(t, speed, _turn_rate, v_l)
 	v_f = SkateMath.apply_carve_scrub(t, v_f, speed, _turn_rate, dt)
 
 	if striding:
@@ -254,7 +272,7 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	if braking:
 		var decel: float = t.auto_brake_decel if auto_brake else SkateMath.brake_decel(t, speed, sliding)
 		v_f = move_toward(v_f, 0.0, decel * brake_in * dt)
-	v_f = SkateMath.apply_resistance(t, v_f, t.drag_tuck if tucking else t.drag, dt)
+	v_f = SkateMath.apply_resistance(t, v_f, SkateMath.drag_for(t, tuck_amount), dt)
 
 	velocity = heading * v_f + right * v_l
 
@@ -262,9 +280,12 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 func _air_step(dt: float, inp: Dictionary) -> void:
 	var t: SkaterTuning = tuning
 	tucking = false
+	tuck_amount = SkateMath.step_tuck(t, tuck_amount, false, dt)
 	striding = false
 	sliding = false
 	t_stopping = false
+	grip_usage = 0.0
+	slip_speed = 0.0
 	_turn_rate = 0.0
 	lean = move_toward(lean, 0.0, deg_to_rad(t.lean_rate_deg) * dt)
 	velocity += Vector3.DOWN * t.gravity * dt
@@ -288,6 +309,11 @@ func _restore_slope_velocity(before_move: Vector3) -> void:
 		if get_slide_collision(i).get_normal().angle_to(Vector3.UP) > floor_max_angle + 0.02:
 			velocity = get_real_velocity()
 			return
+	# A seam or box corner can report a floor normal far steeper than the
+	# ground either side of it; steering the speed along it flings the skater.
+	if SkateMath.is_seam_normal(tuning, ground_normal, get_floor_normal()):
+		velocity = before_move
+		return
 	var along: Vector3 = SkateMath.project_on_plane(before_move, get_floor_normal())
 	if along.length() > 0.001:
 		velocity = along.normalized() * before_move.length()
@@ -321,6 +347,8 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 			_stomp = clampf((impact - tuning.landing_soft_impact)
 				/ maxf(tuning.crash_land_impact - tuning.landing_soft_impact, 0.01), 0.0, 1.0)
 			landed.emit(air_time)
+		if state == State.GROUNDED and SkateMath.is_seam_normal(tuning, ground_normal, n):
+			n = ground_normal
 		ground_normal = n
 		_last_ground_normal = n
 		state = State.GROUNDED
@@ -382,11 +410,15 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	# Crouch while charging a jump, fold forward while tucking, sink on a
 	# stomped landing.
 	_stomp = move_toward(_stomp, 0.0, 2.5 * dt)
-	var crouch: float = maxf(maxf(jump_charge * 0.35, 0.3 if tucking else 0.0), _stomp * 0.4)
+	var crouch: float = maxf(maxf(jump_charge * 0.35, 0.3 * tuck_amount), _stomp * 0.4)
 	crouch = maxf(crouch, 0.15 * _slide_vis)
 	_body_pivot.scale.y = lerpf(_body_pivot.scale.y, 1.0 - crouch, 1.0 - exp(-12.0 * dt))
-	var pitch: float = -0.5 if tucking else (-0.25 if striding else (0.2 if t_stopping and sliding else (-0.15 if t_stopping else 0.0)))
+	var pitch: float = -0.5 * tuck_amount if tuck_amount > 0.05 else (-0.25 if striding else (0.2 if t_stopping and sliding else (-0.15 if t_stopping else 0.0)))
 	_body_pivot.rotation.x = lerpf(_body_pivot.rotation.x, pitch, 1.0 - exp(-10.0 * dt))
+	# Grip running out: the stance gets twitchy so you can see it coming.
+	var edge: float = SkateAudio.edge_level(grip_usage)
+	_wobble_t += dt
+	_body_pivot.rotation.z = (sin(_wobble_t * 38.0) * 0.05 + sin(_wobble_t * 23.0) * 0.03) * edge
 	_animate_stride(dt)
 
 
