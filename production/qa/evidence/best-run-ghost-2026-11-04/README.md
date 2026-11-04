@@ -11,6 +11,7 @@ on Windows, which makes the pale ghost look fainter than it will in game.
 | `01-ghost-on-test-slope/` | `-- --course=test_slope --autopilot=3.5 --hops=1.5 --shots=0.5,4,9,14` | Ghost waits/starts with the clock, then rides its own lane ahead; slower run did not overwrite the ghost (same md5 before/after) |
 | (setup) | `-- --route=blue` on Copperline | FINISH 1:26.98, `copperline_mountain.ghost` written (125 KB) |
 | `02-ghost-on-copperline/` | `-- --route=teal --shots=3,12,25` | 3 s: the ghost mid-stride on the blue line beside the teal run (same figure as the skater, skate pushed out); by 12 s the lines have split and it is out of view |
+| `03-older-ghost-loads-after-update/` | same as 01, after merging tv2let e7d15fd and adding body roll to the pose (POSE_SIZE 11 -> 12) | The 11-float ghost saved earlier still loads (padded) and rides as before |
 
 Unit tests: `tests/unit/ui/test_ghost_track.gd` (sampling, interpolation,
 teleport snap, save-format round trip and rejection), PASS.

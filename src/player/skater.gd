@@ -423,7 +423,7 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 
 
 ## Number of floats in [method visual_pose].
-const POSE_SIZE: int = 11
+const POSE_SIZE: int = 12
 
 
 ## The body's on-screen rotation (whole figure, including crash tumbles), for
@@ -433,11 +433,13 @@ func visual_rotation() -> Quaternion:
 
 
 ## The body's animated pose below the root, for ghost recording: body sway,
-## pitch and crouch, then each skate's position and turn (POSE_SIZE floats).
+## pitch and crouch, then each skate's position and turn, then body roll
+## (POSE_SIZE floats). New floats go at the end so older ghosts still load.
 func visual_pose() -> PackedFloat32Array:
 	var p := PackedFloat32Array([_body_pivot.position.x, _body_pivot.rotation.x, _body_pivot.scale.y])
 	for foot: Node3D in _feet:
 		p.append_array(PackedFloat32Array([foot.position.x, foot.position.y, foot.position.z, foot.rotation.y]))
+	p.append(_body_pivot.rotation.z)
 	return p
 
 
@@ -469,6 +471,7 @@ static func apply_visual_pose(visual: Node3D, pose: PackedFloat32Array) -> void:
 		var k: int = 3 + i * 4
 		foot.position = Vector3(pose[k], pose[k + 1], pose[k + 2])
 		foot.rotation.y = pose[k + 3]
+	body.rotation.z = pose[11]
 
 
 ## Strides: the pushing skate sweeps out to the side and back, then returns

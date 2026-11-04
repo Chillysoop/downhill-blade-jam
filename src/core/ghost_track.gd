@@ -88,18 +88,28 @@ func to_dict() -> Dictionary:
 
 
 ## Restores a recording saved with [method to_dict]. Returns null for data
-## that is missing, malformed, from another format version, or whose pose
-## layout differs from [param expected_pose_size] (an older skater figure).
+## that is missing, malformed, from another format version, or has more pose
+## floats than [param expected_pose_size]. Fewer (an older figure) is padded.
 static func from_dict(d: Variant, expected_pose_size: int, teleport: float = 8.0) -> GhostTrack:
 	if not d is Dictionary or int(d.get("version", 0)) != FORMAT_VERSION:
 		return null
-	if int(d.get("pose_size", -1)) != expected_pose_size or float(d.get("hz", 0.0)) <= 0.0:
+	var saved_pose: int = int(d.get("pose_size", -1))
+	if saved_pose < 0 or saved_pose > expected_pose_size or float(d.get("hz", 0.0)) <= 0.0:
 		return null
 	var raw: Variant = d.get("data")
-	var g := GhostTrack.new(float(d["hz"]), expected_pose_size, teleport)
-	if not raw is PackedFloat32Array or raw.size() % g.stride() != 0:
+	var saved_stride: int = 7 + saved_pose
+	if not raw is PackedFloat32Array or raw.size() % saved_stride != 0:
 		return null
-	g.data = raw
+	var g := GhostTrack.new(float(d["hz"]), expected_pose_size, teleport)
+	if saved_pose == expected_pose_size:
+		g.data = raw
+	else:
+		# Older recording with fewer pose floats: pad the new ones with 0.
+		var pad := PackedFloat32Array()
+		pad.resize(expected_pose_size - saved_pose)
+		for i: int in raw.size() / saved_stride:
+			g.data.append_array(raw.slice(i * saved_stride, (i + 1) * saved_stride))
+			g.data.append_array(pad)
 	g.finish_time = float(d.get("time", g.duration()))
 	return g
 
