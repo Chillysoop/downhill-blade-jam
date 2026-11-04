@@ -1,0 +1,7 @@
+Reviewed-Content-Hash: src/levels/course/course_builder.gd 535a8ca2074d8d71d845a0336be97ac857f82ee0
+Reviewed-Content-Hash: src/levels/course/course_kit.gd 1ef7226ce12558ae00c4e23fa2e2138e261d8912
+Reviewed-Content-Hash: src/levels/course/course_math.gd 9ba7196b8286f20caf6aef682cfe9c274d2132ca
+Reviewed-Content-Hash: src/levels/course/course_terrain.gd 04b35e5238af0da0774431c01ea4d964c3c16b6c
+Reviewed-Content-Hash: src/levels/course/surface_drag.gd 215bb5852fcfc2353c325f621e753f8cfa5fa3b4
+Reviewed-Content-Hash: assets/data/course_copperline_mountain.json e7ed759b55ddb75de6b16b3fff1873e42a96cd47
+Reviewed-Content-Hash: src/main.gd 2c5778feb8931c374dc92eed60895f2bda1231fc
