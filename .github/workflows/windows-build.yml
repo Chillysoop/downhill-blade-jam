@@ -71,6 +71,7 @@ jobs:
           echo "${GITHUB_SHA::7} ${GITHUB_REF_NAME} $(date -u +%Y-%m-%dT%H:%MZ)" > build/windows/build-info.txt
           (cd build/windows && zip -9 -q ../DownhillBladeJam-windows.zip DownhillBladeJam.exe build-info.txt)
           cp tools/launcher/launcher.ps1 build/launcher.ps1
+          cp tools/launcher/Install-DownhillBladeJam.cmd build/Install-DownhillBladeJam.cmd
           ls -la build
 
       - name: Publish latest-build release
@@ -80,10 +81,10 @@ jobs:
           set -e
           notes="Automatic build of ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}. The desktop launcher installs this for you."
           if gh release view latest-build >/dev/null 2>&1; then
-            gh release upload latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 --clobber
+            gh release upload latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd --clobber
             gh release edit latest-build --notes "$notes" --prerelease
           else
-            gh release create latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 \
+            gh release create latest-build build/DownhillBladeJam-windows.zip build/launcher.ps1 build/Install-DownhillBladeJam.cmd \
               --title "Latest build" --notes "$notes" --prerelease --target "$GITHUB_SHA"
           fi
 
