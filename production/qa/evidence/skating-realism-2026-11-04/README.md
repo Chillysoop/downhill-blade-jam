@@ -14,3 +14,4 @@ washed out under llvmpipe; not representative of Forward+ on Windows).
 Run result: test slope finished by autopilot lane 0.3 in 19.4 s (was 14.5 s),
 top speed 91 km/h (was 109 km/h). Powerslide from 57 km/h to 10 km/h in ~3.5 s.
 Unit tests: `godot --headless --script res://tests/unit/skater/test_skate_math.gd` PASS.
+| tstop/shot_02.07.png | T-stop at low speed (2026-11-04, replaces the heel brake visual at Conner's request) |

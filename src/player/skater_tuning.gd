@@ -57,9 +57,10 @@ extends Resource
 @export var pivot_turn_rate: float = 1.8
 
 @export_group("Braking")
-## Heel-brake deceleration (m/s²). Real heel brakes manage about 0.3-0.4 g.
-@export var heel_brake_decel: float = 3.4
-## Above this speed (m/s) braking is a powerslide instead of a heel brake.
+## T-stop deceleration (m/s²): the trailing skate dragged sideways behind the
+## front one. Real T-stops manage about 0.3-0.4 g.
+@export var t_stop_decel: float = 3.4
+## Above this speed (m/s) braking is a powerslide instead of a T-stop.
 @export var powerslide_speed: float = 6.0
 ## Powerslide deceleration (m/s²): skates turned sideways, wheels sliding.
 ## About 0.6 g.

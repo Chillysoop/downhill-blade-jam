@@ -141,8 +141,8 @@ func test_stride_takeoff_is_realistic(t: SkaterTuning) -> void:
 
 
 func test_braking_distances(t: SkaterTuning) -> void:
-	check(SkateMath.brake_decel(t, 20.0, true) > SkateMath.brake_decel(t, 3.0, false), "powerslide out-brakes the heel brake")
-	check(is_equal_approx(SkateMath.brake_decel(t, 3.0, false), t.heel_brake_decel), "heel brake when slow")
+	check(SkateMath.brake_decel(t, 20.0, true) > SkateMath.brake_decel(t, 3.0, false), "powerslide out-brakes the T-stop")
+	check(is_equal_approx(SkateMath.brake_decel(t, 3.0, false), t.t_stop_decel), "T-stop when slow")
 	# Powerslide from 90 km/h on the flat: real skaters need roughly 40-70 m.
 	var v: float = 25.0
 	var dist: float = 0.0

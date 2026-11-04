@@ -58,10 +58,10 @@ static func stride_accel(t: SkaterTuning, speed: float, phase: float) -> float:
 	return t.stride_peak_accel * sin(PI * phase / t.stride_push_share) * falloff
 
 
-## Braking deceleration (m/s²): a heel brake when slow, a powerslide when
+## Braking deceleration (m/s²): a T-stop when slow, a powerslide when
 ## [param sliding] (which Skater sets above powerslide_speed).
 static func brake_decel(t: SkaterTuning, _speed: float, sliding: bool) -> float:
-	return t.powerslide_decel if sliding else t.heel_brake_decel
+	return t.powerslide_decel if sliding else t.t_stop_decel
 
 
 ## Applies rolling resistance and quadratic drag to a forward speed.

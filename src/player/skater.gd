@@ -3,7 +3,7 @@ extends CharacterBody3D
 ## The player: an inline skater driven by momentum and gravity.
 ##
 ## Controls (see InputSetup): steer (lean onto the edges and carve), forward
-## (stride when slow, tuck when fast), brake (heel brake when slow, powerslide
+## (stride when slow, tuck when fast), brake (T-stop when slow, powerslide
 ## when fast), jump (hold to charge, release to pop). Movement rules live in
 ## SkateMath; every number lives in [member tuning]. Implements
 ## design/game-brief.md "Core Mechanics" with real inline skating physics.
@@ -40,6 +40,8 @@ var tucking: bool = false
 var striding: bool = false
 ## True while braking in a powerslide (skates turned sideways).
 var sliding: bool = false
+## True while braking with a T-stop (trailing skate dragged sideways behind).
+var t_stopping: bool = false
 ## Body lean onto the edges in radians, positive = leaning right.
 var lean: float = 0.0
 var jump_charge: float = 0.0
@@ -101,6 +103,7 @@ func respawn() -> void:
 	lean = 0.0
 	striding = false
 	sliding = false
+	t_stopping = false
 	_stride_phase = 0.0
 	_stomp = 0.0
 	auto_brake = false
@@ -214,6 +217,7 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 		sliding = false
 
 	# Lean onto the edges; the lean and the speed decide the carve.
+	t_stopping = braking and not sliding and speed > 0.3
 	var steer: float = float(inp["steer"]) * (t.powerslide_steer_mult if sliding else 1.0)
 	lean = SkateMath.step_lean(t, lean, steer, tucking, dt)
 	_turn_rate = SkateMath.carve_turn_rate(t, speed, lean)
@@ -250,6 +254,7 @@ func _air_step(dt: float, inp: Dictionary) -> void:
 	tucking = false
 	striding = false
 	sliding = false
+	t_stopping = false
 	_turn_rate = 0.0
 	lean = move_toward(lean, 0.0, deg_to_rad(t.lean_rate_deg) * dt)
 	velocity += Vector3.DOWN * t.gravity * dt
@@ -369,7 +374,7 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 	var crouch: float = maxf(maxf(jump_charge * 0.35, 0.3 if tucking else 0.0), _stomp * 0.4)
 	crouch = maxf(crouch, 0.15 * _slide_vis)
 	_body_pivot.scale.y = lerpf(_body_pivot.scale.y, 1.0 - crouch, 1.0 - exp(-12.0 * dt))
-	var pitch: float = -0.5 if tucking else (-0.25 if striding else 0.0)
+	var pitch: float = -0.5 if tucking else (-0.25 if striding else (-0.15 if t_stopping else 0.0))
 	_body_pivot.rotation.x = lerpf(_body_pivot.rotation.x, pitch, 1.0 - exp(-10.0 * dt))
 	_animate_stride(dt)
 
@@ -388,10 +393,18 @@ func _animate_stride(dt: float) -> void:
 		var side: float = -1.0 if i == 0 else 1.0
 		var amount: float = push if i == _stride_leg else 0.0
 		var target := Vector3(side * (0.14 + 0.32 * amount), 0.06 * amount, 0.28 * amount)
+		var yaw: float = -side * 0.5 * amount
+		if t_stopping:
+			# T-stop: left skate rolls forward, right skate trails behind it
+			# turned crosswise, dragging its wheels.
+			target = Vector3(-0.08, 0.0, -0.08) if i == 0 else Vector3(0.0, 0.0, 0.42)
+			yaw = 0.0 if i == 0 else PI / 2.0
 		foot.position = foot.position.lerp(target, k)
-		foot.rotation.y = lerpf(foot.rotation.y, -side * 0.5 * amount, k)
+		foot.rotation.y = lerpf(foot.rotation.y, yaw, k)
 	var glide_side: float = 1.0 if _stride_leg == 0 else -1.0
 	var sway: float = glide_side * 0.1 * push
+	if t_stopping:
+		sway = -0.06
 	_body_pivot.position.x = lerpf(_body_pivot.position.x, sway, k)
 
 
