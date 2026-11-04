@@ -7,10 +7,18 @@ extends Node
 ##   --shots=<t1,t2,...>    save screenshots at those times (seconds)
 ##   --shot-dir=<path>      where screenshots go (default user://shots)
 ##   --quit-after=<s>       quit after <s> seconds
+##   --course=<path|test_slope>  load another course (read by main.gd)
+##   --route=<name>         autopilot follows a named course route (tucks, steers)
+##   --start-at=<x,z>       start the skater at that ground spot instead
+##   --overview=<x,y,z,tx,ty,tz>  fixed camera at x,y,z looking at tx,ty,tz
 ## Used for automated simulation runs and screenshot evidence.
 
 var skater: Skater
+## The course, when the run is on one (for routes and start spots).
+var course: CourseBuilder
 var args: Dictionary = {}
+var _route := PackedVector2Array()
+var _route_i: int = 0
 var _t: float = 0.0
 var _next_tel: float = 0.0
 var _shots: Array[float] = []
@@ -44,6 +52,29 @@ func _ready() -> void:
 			var steer: float = clampf(lateral_err * 0.08 * signf(right.x) - heading_err * 1.5, -1.0, 1.0)
 			var jump: bool = _jump_held > 0.0
 			return {"steer": steer, "forward": 1.0, "brake": 0.0, "jump": jump}
+	if args.has("route") and course != null:
+		_route = CourseMath.sample_spline(course.routes.get(String(args["route"]), []), 4.0)
+		skater.input_override = _route_input
+	if args.has("start-at") and course != null:
+		var xz: PackedStringArray = String(args["start-at"]).split(",")
+		var p := Vector2(float(xz[0]), float(xz[1]))
+		var pos := Vector3(p.x, course.terrain.height_at(p.x, p.y) + 0.4, p.y)
+		var ahead := Vector3(course.terrain.axis_at(p.y - 20.0), pos.y, p.y - 20.0)
+		skater.set_spawn(Transform3D(Basis.IDENTITY, pos), (ahead - pos) * Vector3(1, 0, 1))
+		skater.respawn()
+		for i: int in _route.size():
+			if _route[i].y < p.y:
+				_route_i = i
+				break
+	if args.has("overview"):
+		var v: PackedStringArray = String(args["overview"]).split(",")
+		var cam := Camera3D.new()
+		cam.far = 6000.0
+		cam.fov = 60.0
+		add_child(cam)
+		cam.global_position = Vector3(float(v[0]), float(v[1]), float(v[2]))
+		cam.look_at(Vector3(float(v[3]), float(v[4]), float(v[5])), Vector3.UP)
+		cam.make_current()
 	if args.has("shots"):
 		for s: String in String(args["shots"]).split(","):
 			_shots.append(float(s))
@@ -52,6 +83,23 @@ func _ready() -> void:
 	skater.landed.connect(func(at: float) -> void:
 		if args.has("telemetry"):
 			print("[t=%.2f] landed after %.2fs air" % [_t, at]))
+
+
+func _route_input() -> Dictionary:
+	var p := Vector2(skater.global_position.x, skater.global_position.z)
+	# Advance along the route; aim at a point ~18 m ahead.
+	while _route_i < _route.size() - 1 and p.distance_to(_route[_route_i]) < 18.0:
+		_route_i += 1
+	while _route_i < _route.size() - 1 and _route[_route_i].y > p.y + 2.0:
+		_route_i += 1
+	var target: Vector2 = _route[mini(_route_i, _route.size() - 1)]
+	var to: Vector2 = (target - p).normalized()
+	var h := Vector2(skater.heading.x, skater.heading.z).normalized()
+	var err: float = h.angle_to(to)
+	var steer: float = 0.0 if absf(err) < 0.04 else clampf(err * 1.2, -1.0, 1.0)
+	var jump: bool = _jump_held > 0.0
+	var fwd: float = 1.0 if absf(err) < 0.25 else 0.0
+	return {"steer": steer, "forward": fwd, "brake": 0.0, "jump": jump}
 
 
 func _physics_process(dt: float) -> void:
