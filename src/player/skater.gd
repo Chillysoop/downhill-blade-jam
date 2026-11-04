@@ -25,6 +25,9 @@ enum State { GROUNDED, AIR, CRASHED }
 var input_override: Callable
 ## When true the skater ignores input and brakes to a stop (after the finish).
 var auto_brake: bool = false
+## True after a respawn until the player presses something: the skater holds
+## still at the start so a run only begins when the player begins it.
+var waiting_for_start: bool = false
 
 var state: State = State.AIR
 ## Facing direction, kept tangent to the ground while grounded.
@@ -82,6 +85,7 @@ func respawn() -> void:
 	_charging = false
 	_hop_buffer = 0.0
 	auto_brake = false
+	waiting_for_start = true
 	crash_reason = ""
 	_visual.rotation = Vector3.ZERO
 	respawned.emit()
@@ -94,6 +98,13 @@ func get_speed() -> float:
 
 func _physics_process(dt: float) -> void:
 	var inp: Dictionary = _read_input()
+	if waiting_for_start:
+		var any_input: bool = absf(float(inp["steer"])) > 0.1 or float(inp["forward"]) > 0.1 \
+			or float(inp["brake"]) > 0.1 or bool(inp["jump"])
+		if not any_input:
+			velocity = Vector3.ZERO
+			return
+		waiting_for_start = false
 	if state == State.CRASHED:
 		_crash_step(dt)
 		return

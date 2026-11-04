@@ -23,7 +23,7 @@ func _ready() -> void:
 	hint.offset_left = 24.0
 	hint.offset_top = -44.0
 	hint.offset_bottom = -12.0
-	hint.text = "A/D steer   W push / tuck   S brake   Space hold+release jump (tap = hop)   R restart"
+	hint.text = "Press any control to drop in.   A/D steer   W push / tuck   S brake   Space hold+release jump (tap = hop)   R restart"
 	hint.modulate = Color(1, 1, 1, 0.75)
 	var build := _label(Vector2(0, 0), 14)
 	build.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)

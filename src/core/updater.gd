@@ -47,7 +47,10 @@ func _on_id_received(result: int, code: int, _headers: PackedStringArray, body: 
 		_finish("update check failed (%d/%d)" % [result, code])
 		return
 	var latest: String = body.get_string_from_utf8().strip_edges()
-	if latest.is_empty() or latest == BuildId.SHA:
+	if latest.is_empty():
+		_finish("update check returned nothing")
+		return
+	if latest == BuildId.SHA:
 		_finish("up to date (%s)" % BuildId.SHA)
 		return
 	print("Updater: %s -> %s" % [BuildId.SHA, latest])
@@ -95,6 +98,7 @@ func _install(zip_path: String) -> String:
 	if zip.open(zip_path) != OK:
 		return "downloaded update is not a valid zip"
 	var data: PackedByteArray = zip.read_file(EXE_IN_ZIP)
+	var info: PackedByteArray = zip.read_file("build-info.txt") if zip.file_exists("build-info.txt") else PackedByteArray()
 	zip.close()
 	if data.size() < 1_000_000:
 		return "downloaded update is missing the game"
@@ -111,6 +115,12 @@ func _install(zip_path: String) -> String:
 		DirAccess.rename_absolute(old, exe)
 		return "could not write the new game"
 	f.close()
+	if not info.is_empty():
+		var fi := FileAccess.open(exe.get_base_dir().path_join("build-info.txt"), FileAccess.WRITE)
+		if fi != null:
+			fi.store_buffer(info)
+			fi.close()
+	print("Updater: installed new build, restarting")
 	return ""
 
 
