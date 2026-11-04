@@ -1,0 +1,17 @@
+{
+ "schema_version": 1,
+ "courses": [
+  {
+   "id": "copperline_mountain",
+   "name": "Copperline Mountain",
+   "path": "res://assets/data/course_copperline_mountain.json",
+   "blurb": "A huge paved mountain fan. Lines braid, split and rejoin all the way down."
+  },
+  {
+   "id": "test_slope",
+   "name": "Test Slope",
+   "path": "test_slope",
+   "blurb": "The original movement test hill. Short, simple, good for warming up."
+  }
+ ]
+}

@@ -30,6 +30,9 @@ var auto_brake: bool = false
 ## True after a respawn until the player presses something: the skater holds
 ## still at the start so a run only begins when the player begins it.
 var waiting_for_start: bool = false
+## While waiting at the start, also wait for every control to be let go first
+## (set after a menu choice so the Enter/Space/A press is not read as riding).
+var hold_until_released: bool = false
 
 var state: State = State.AIR
 ## Facing direction, kept tangent to the ground while grounded.
@@ -123,6 +126,12 @@ func _physics_process(dt: float) -> void:
 	if waiting_for_start:
 		var any_input: bool = absf(float(inp["steer"])) > 0.1 or float(inp["forward"]) > 0.1 \
 			or float(inp["brake"]) > 0.1 or bool(inp["jump"])
+		if hold_until_released:
+			# Keys still down from a menu press must not drop the skater in.
+			if not any_input:
+				hold_until_released = false
+			velocity = Vector3.ZERO
+			return
 		if not any_input:
 			velocity = Vector3.ZERO
 			return
