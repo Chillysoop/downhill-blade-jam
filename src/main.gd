@@ -52,6 +52,7 @@ func _ready() -> void:
 		drag.skater = skater
 		drag.course = course
 		add_child(drag)
+		drag.slow_ground_changed.connect(func(n: String) -> void: hud.show_slow_ground(n))
 
 	camera = ChaseCamera.new()
 	camera.target = skater

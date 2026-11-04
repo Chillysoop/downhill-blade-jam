@@ -1,0 +1,5 @@
+Reviewed-Content-Hash: src/levels/course/terrain.gdshader 10f9b3bbf67dec6cc121e3b28fb49e12c01bce93
+Reviewed-Content-Hash: src/levels/course/course_builder.gd 9644a53bebb495953f22522fc7925c4c2b2070a8
+Reviewed-Content-Hash: src/levels/course/surface_drag.gd f2e3d7e069528d61ded6749938768677c71c6fc1
+Reviewed-Content-Hash: src/ui/hud.gd d20fbf6b6aac47b4cdeb5ab2bac8924e70a146e2
+Reviewed-Content-Hash: src/main.gd 15b9038aea4bd56d0f678e7de272cb30ca7f16b7
