@@ -9,6 +9,17 @@ extends Node3D
 ## Emitted when the skater crosses checkpoint gate [param index] (1-based,
 ## in order). [param respawn] is where a crash now sends the skater.
 signal checkpoint_reached(index: int, name: String, respawn: Transform3D)
+## Emitted when the skater hits a city hazard (people, traffic) hard enough
+## to bail; main.gd turns it into a crash.
+signal hazard_hit(reason: String)
+## Emitted when the skater falls into the course's water.
+signal splashed
+
+## Course time in seconds since the run started (frozen while waiting at the
+## start). Traffic is a pure function of it, so every restart is the same.
+var clock: float = 0.0
+## Water surface height, or -INF when the course has no water.
+var water_y: float = -INF
 
 ## Course display name.
 var course_name: String = ""
@@ -31,7 +42,8 @@ var _data: Dictionary
 var _gates: Array[Dictionary] = []
 var _next_gate: int = 0
 var _oob_u: float = 1.25
-var _skater: Node3D
+var _skater: Skater
+var _kit: CourseKit
 
 static var _joint_tex: ImageTexture
 
@@ -53,8 +65,13 @@ func load_course(path: String) -> void:
 	kit.name = "Features"
 	kit.terrain = terrain
 	add_child(kit)
+	_kit = kit
 	for f: Dictionary in _data.get("features", []):
 		kit.place(f)
+	if kit._city != null:
+		kit._city.hazard_hit.connect(func(r: String) -> void: hazard_hit.emit(r))
+	if _data.has("water"):
+		_build_water(_data["water"])
 	var t2: int = Time.get_ticks_msec()
 	_build_gates(kit)
 	routes = _data.get("routes", {})
@@ -69,13 +86,16 @@ func load_course(path: String) -> void:
 
 
 ## Starts watching [param skater] for gate crossings.
-func track(skater: Node3D) -> void:
+func track(skater: Skater) -> void:
 	_skater = skater
 
 
 ## Resets checkpoint progress (a restart from the top).
 func reset_progress() -> void:
 	_next_gate = 0
+	clock = 0.0
+	if _kit != null and _kit._city != null:
+		_kit._city.advance(clock)
 
 
 ## Surface type under world position [param p] (CourseTerrain.Surface).
@@ -93,7 +113,11 @@ func is_out_of_bounds(p: Vector3) -> bool:
 	return absf(terrain.fan_u(p.x, p.z)) > _oob_u
 
 
-func _physics_process(_dt: float) -> void:
+func _physics_process(dt: float) -> void:
+	if _skater != null and not _skater.waiting_for_start:
+		clock += dt
+	if _kit != null and _kit._city != null:
+		_kit._city.advance(clock)
 	if _skater == null or _next_gate >= _gates.size():
 		return
 	var gate: Dictionary = _gates[_next_gate]
@@ -107,9 +131,11 @@ func _physics_process(_dt: float) -> void:
 				best = absf(float(px) - x)
 				pad_x = float(px)
 		var pz: float = float(gate["z"]) - float(gate.get("pad_offset", 15.0))
-		var pos := Vector3(pad_x, terrain.height_at(pad_x, pz) + 0.4, pz)
+		var pos := Vector3(pad_x, terrain.height_at(pad_x, pz) + float(gate.get("pad_lift", 0.4)), pz)
 		var ahead_z: float = pz - 20.0
-		var ahead := Vector3(terrain.axis_at(ahead_z), 0.0, ahead_z)
+		# City grids respawn facing straight down the street ("face_down").
+		var ahead_x: float = pad_x if bool(gate.get("face_down", false)) else terrain.axis_at(ahead_z)
+		var ahead := Vector3(ahead_x, 0.0, ahead_z)
 		var facing: Vector3 = ((ahead - pos) * Vector3(1, 0, 1)).normalized()
 		checkpoint_reached.emit(_next_gate, gate.get("name", "Split"), Transform3D(Basis.looking_at(facing, Vector3.UP), pos))
 
@@ -120,13 +146,17 @@ func _build_gates(kit: CourseKit) -> void:
 		var axis: float = terrain.axis_at(z)
 		var half: float = terrain.width_at(z) * 0.5
 		var spacing: float = float(g.get("tower_spacing", 60.0))
-		var x: float = axis - half + spacing * 0.5
-		while x < axis + half:
-			var gp: Vector3 = kit.ground(Vector2(x, z))
+		var posts: Array = g.get("posts", [])
+		if posts.is_empty():
+			var x: float = axis - half + spacing * 0.5
+			while x < axis + half:
+				posts.append(x)
+				x += spacing
+		for px: Variant in posts:
+			var gp: Vector3 = kit.ground(Vector2(float(px), z))
 			kit._static_box(gp + Vector3(0, 3.0, 0), Basis.IDENTITY, Vector3(0.5, 6.0, 0.5), "white", false)
 			kit._static_box(gp + Vector3(0, 6.3, 0), Basis.IDENTITY, Vector3(0.6, 0.6, 0.6), "green", false)
 			kit._static_box(gp + Vector3(0.9, 5.2, 0), Basis.IDENTITY, Vector3(1.6, 1.0, 0.05), "green", false)
-			x += spacing
 		if String(g.get("kind", "split")) == "finish":
 			finish = Area3D.new()
 			add_child(finish)
@@ -137,11 +167,14 @@ func _build_gates(kit: CourseKit) -> void:
 			col.shape = shape
 			finish.add_child(col)
 			# Painted finish line across the toe and an arch over the main lane.
-			kit._static_box(kit.ground(Vector2(axis, z), 0.03), Basis.IDENTITY, Vector3(half * 2.0, 0.06, 1.2), "white", false)
 			var ax: float = float(g.get("arch_x", axis))
+			var line_w: float = float(g.get("line_width", half * 2.0))
+			var arch_w: float = float(g.get("arch_width", 18.0))
+			var ay: float = float(g["y"]) if g.has("y") else terrain.height_at(ax, z)
+			kit._static_box(Vector3(ax, ay + 0.03, z), Basis.IDENTITY, Vector3(line_w, 0.06, 1.2), "white", false)
 			for side: float in [-1.0, 1.0]:
-				kit._static_box(kit.ground(Vector2(ax + side * 9.0, z), 4.0), Basis.IDENTITY, Vector3(0.9, 8.0, 0.9), "green", false)
-			kit._static_box(kit.ground(Vector2(ax, z), 8.3), Basis.IDENTITY, Vector3(19.0, 1.2, 1.0), "green", false)
+				kit._static_box(Vector3(ax + side * arch_w * 0.5, ay + 4.0, z), Basis.IDENTITY, Vector3(0.9, 8.0, 0.9), "green", false)
+			kit._static_box(Vector3(ax, ay + 8.3, z), Basis.IDENTITY, Vector3(arch_w + 1.0, 1.2, 1.0), "green", false)
 		else:
 			_gates.append(g)
 
@@ -158,6 +191,11 @@ func _build_terrain_nodes() -> void:
 	}
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://src/levels/course/terrain.gdshader")
+	# A course can repaint its ground (city asphalt instead of pale concrete).
+	var look: Dictionary = _data.get("look", {}).get("terrain", {})
+	for key: String in look:
+		var v: Variant = look[key]
+		mat.set_shader_parameter(key, Color.html(v) if v is String else v)
 	var nx: int = terrain.nx
 	var nz: int = terrain.nz
 	lowest_y = INF
@@ -217,6 +255,41 @@ func _build_terrain_nodes() -> void:
 			mi.mesh = mesh
 			mi.material_override = mat
 			body.add_child(mi)
+
+
+## Water: a sea plane at "y" over the box "x_min".."x_max", "z_from".."z_to",
+## with a trigger just under the surface. Falling in emits [signal splashed].
+func _build_water(w: Dictionary) -> void:
+	water_y = float(w["y"])
+	var x0: float = float(w["x_min"])
+	var x1: float = float(w["x_max"])
+	var z0: float = float(w["z_from"])
+	var z1: float = float(w["z_to"])
+	var center := Vector3((x0 + x1) * 0.5, water_y, (z0 + z1) * 0.5)
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(absf(x1 - x0), absf(z1 - z0))
+	var mi := MeshInstance3D.new()
+	mi.mesh = plane
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color.html(String(w.get("color", "#1f5f7a")))
+	m.roughness = 0.15
+	m.metallic = 0.3
+	mi.material_override = m
+	mi.position = center
+	mi.name = "Water"
+	add_child(mi)
+	var area := Area3D.new()
+	area.name = "WaterTrigger"
+	add_child(area)
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(absf(x1 - x0), 40.0, absf(z1 - z0))
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	area.add_child(cs)
+	area.position = center - Vector3(0, 20.4, 0)
+	area.body_entered.connect(func(b: Node3D) -> void:
+		if b == _skater:
+			splashed.emit())
 
 
 ## Pale concrete texture with darker expansion joints; multiplies the ground

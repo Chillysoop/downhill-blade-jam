@@ -363,6 +363,13 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 		_since_ground += dt
 
 
+## Makes the skater bail for an outside reason (a car, a pedestrian, the
+## bay), with the usual respawn. Ignored while already crashed.
+func bail(reason: String) -> void:
+	if state != State.CRASHED:
+		_crash(reason)
+
+
 func _crash(reason: String) -> void:
 	state = State.CRASHED
 	crash_reason = reason

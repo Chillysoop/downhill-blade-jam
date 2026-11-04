@@ -27,6 +27,8 @@ var _half_row := PackedFloat32Array()
 var _noise_large := FastNoiseLite.new()
 var _noise_small := FastNoiseLite.new()
 var _noise_wander := FastNoiseLite.new()
+## 1 where a street's own width has set the height (feathers leave it alone).
+var _lock := PackedByteArray()
 
 
 ## Builds both grids from the "terrain" block of a course data Dictionary.
@@ -47,6 +49,10 @@ func build(data: Dictionary) -> void:
 	_setup_noise(_noise_small, seed + 1, data["noise"]["small_wavelength"])
 	_setup_noise(_noise_wander, seed + 2, 1.0)
 	_base_pass()
+	_lock.resize(nx * nz)
+	_lock.fill(0)
+	for st: Dictionary in data.get("streets", []):
+		_stamp_street(st)
 	# Order matters: surface bands, then carved channels, then raised islands
 	# and bars on top, then cliff steps, then the steepness (rock) pass.
 	for band: Dictionary in data.get("bands", []):
@@ -137,6 +143,12 @@ func _base_pass() -> void:
 	var m_rock_above: float = float(margin["rock_above"])
 	_axis_row.resize(nz)
 	_half_row.resize(nz)
+	# City courses: lot heights come from the street level grid instead of
+	# the fan's base profile, tilt and crown.
+	var level_grid: bool = _data.has("level_grid")
+	var lg_x: Array = _data["level_grid"]["xs"] if level_grid else []
+	var lg_z: Array = _data["level_grid"]["zs"] if level_grid else []
+	var lg_y: Array = _data["level_grid"]["ys"] if level_grid else []
 	for iz: int in nz:
 		var z: float = row_z(iz)
 		var base: float = CourseMath.curve(_data["base"], z)
@@ -156,7 +168,9 @@ func _base_pass() -> void:
 			var u: float = dx / edge
 			var au: float = absf(u)
 			var h: float = base + tilt * dx
-			if au <= 1.0:
+			if level_grid:
+				h = CourseMath.grid_bilinear(lg_x, lg_z, lg_y, x, z)
+			elif au <= 1.0:
 				h += crown_h * (1.0 - u * u)
 			var wall: float = 0.0
 			if au > 1.0:
@@ -327,6 +341,68 @@ func _stamp_line(def: Dictionary, carve: bool) -> void:
 				surfaces[i] = surf
 			elif rim > 0.0 and d <= half + rim:
 				surfaces[i] = rim_surf
+
+
+## Stamps a street: [x, z, y] points joined by straight runs, level across
+## its [code]width[/code], painted [code]surface[/code] (default concrete),
+## blended into the ground around it over [code]feather[/code] metres.
+## Streets stamped later win where they overlap (intersections share heights).
+func _stamp_street(def: Dictionary) -> void:
+	var raw: Array = def["points"]
+	if raw.size() < 2:
+		return
+	var pts: Array[Vector3] = []
+	for q: Array in raw:
+		pts.append(Vector3(float(q[0]), float(q[1]), float(q[2])))
+	var half: float = float(def["width"]) * 0.5
+	var feather: float = float(def.get("feather", 6.0))
+	var surf: int = _surface_id(def.get("surface", "concrete"))
+	var reach: float = half + feather + cell
+	var minx: float = INF
+	var maxx: float = -INF
+	var minz: float = INF
+	var maxz: float = -INF
+	for p: Vector3 in pts:
+		minx = minf(minx, p.x)
+		maxx = maxf(maxx, p.x)
+		minz = minf(minz, p.y)
+		maxz = maxf(maxz, p.y)
+	var r: Array[int] = _cell_range(minx - reach, maxx + reach, minz - reach, maxz + reach)
+	var w: int = r[1] - r[0] + 1
+	var hgt: int = r[3] - r[2] + 1
+	var dist := PackedFloat32Array()
+	dist.resize(w * hgt)
+	dist.fill(INF)
+	var sy := PackedFloat32Array()
+	sy.resize(w * hgt)
+	for k: int in range(1, pts.size()):
+		var a: Vector3 = pts[k - 1]
+		var b: Vector3 = pts[k]
+		var a2 := Vector2(a.x, a.y)
+		var b2 := Vector2(b.x, b.y)
+		var sr: Array[int] = _cell_range(minf(a.x, b.x) - reach, maxf(a.x, b.x) + reach, minf(a.y, b.y) - reach, maxf(a.y, b.y) + reach)
+		for iz: int in range(sr[2], sr[3] + 1):
+			var pz: float = row_z(iz)
+			var lrow: int = (iz - r[2]) * w - r[0]
+			for ix: int in range(sr[0], sr[1] + 1):
+				var p := Vector2(col_x(ix), pz)
+				var d: float = CourseMath.dist_to_segment(p, a2, b2)
+				var li: int = lrow + ix
+				if d < dist[li]:
+					dist[li] = d
+					sy[li] = CourseMath.street_height(p, a, b)
+	for iz: int in range(r[2], r[3] + 1):
+		for ix: int in range(r[0], r[1] + 1):
+			var li: int = (iz - r[2]) * w + ix - r[0]
+			var d: float = dist[li]
+			var i: int = iz * nx + ix
+			if d <= half:
+				heights[i] = sy[li]
+				surfaces[i] = surf
+				_lock[i] = 1
+			elif d < half + feather and _lock[i] == 0:
+				var k: float = smoothstep(0.0, 1.0, (d - half) / feather)
+				heights[i] = lerpf(sy[li], heights[i], k)
 
 
 ## Scattered braid islets (seeded) inside a fan region, kept clear of the

@@ -13,6 +13,8 @@ func _init() -> void:
 	test_bump_profile_shape()
 	test_ellipse_outside_signs()
 	test_rough_drag_floor()
+	test_grid_bilinear_corners_and_middle()
+	test_street_height_along_and_across()
 	print("CourseMath tests: %s" % ("PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
@@ -78,3 +80,23 @@ func test_rough_drag_floor() -> void:
 	check(SurfaceDrag.extra_decel(rule, 3.0) == 0.0, "no rough drag below the push floor")
 	check(SurfaceDrag.extra_decel(rule, 20.0) > SurfaceDrag.extra_decel(rule, 10.0), "rough drag grows with speed")
 	check(SurfaceDrag.extra_decel({}, 20.0) == 0.0, "concrete has no extra drag")
+
+
+func test_grid_bilinear_corners_and_middle() -> void:
+	# Hillcrest Drop lots: heights between intersections (design/levels/hillcrest-drop.md §3.2).
+	var xs: Array = [0.0, 100.0]
+	var zs: Array = [0.0, -100.0]
+	var ys: Array = [[0.0, -10.0], [-20.0, -30.0]]
+	check(is_equal_approx(CourseMath.grid_bilinear(xs, zs, ys, 0.0, 0.0), 0.0), "grid corner top-left")
+	check(is_equal_approx(CourseMath.grid_bilinear(xs, zs, ys, 100.0, -100.0), -30.0), "grid corner bottom-right")
+	check(is_equal_approx(CourseMath.grid_bilinear(xs, zs, ys, 50.0, -50.0), -15.0), "grid middle")
+	check(is_equal_approx(CourseMath.grid_bilinear(xs, zs, ys, -40.0, 30.0), 0.0), "grid clamps outside")
+
+
+func test_street_height_along_and_across() -> void:
+	# A street is level across its width and straight between its points.
+	var a := Vector3(0.0, 0.0, -50.0)   # x, z, y
+	var b := Vector3(0.0, -100.0, -70.0)
+	check(is_equal_approx(CourseMath.street_height(Vector2(0.0, -50.0), a, b), -60.0), "street halfway")
+	check(is_equal_approx(CourseMath.street_height(Vector2(6.0, -50.0), a, b), -60.0), "street level across")
+	check(is_equal_approx(CourseMath.street_height(Vector2(0.0, 20.0), a, b), -50.0), "street clamps past its start")

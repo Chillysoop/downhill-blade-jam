@@ -9,6 +9,7 @@ extends Node3D
 ## The ground the features sit on.
 var terrain: CourseTerrain
 var _materials: Dictionary = {}
+var _city: CityKit
 ## Colours by material kind. Shared colour language (§2.12): yellow = skip
 ## takeoff, red = hazard, green/white = checkpoint.
 var colors: Dictionary = {
@@ -58,8 +59,20 @@ func place(f: Dictionary) -> void:
 			markers(f)
 		"chairlift":
 			chairlift(f)
+		"solids", "crowd", "traffic", "paint":
+			city().place(f)
 		_:
 			push_warning("CourseKit: unknown feature type '%s'" % f["type"])
+
+
+## The city pieces (buildings, crowds, traffic, road paint), made on first use.
+func city() -> CityKit:
+	if _city == null:
+		_city = CityKit.new()
+		_city.name = "City"
+		_city.kit = self
+		add_child(_city)
+	return _city
 
 
 ## Ground point at world (x, z) plus [param lift] metres.
@@ -74,7 +87,11 @@ func ground(p: Vector2, lift: float = 0.0) -> Vector3:
 func ramp(a: Vector2, b: Vector2, lift_a: float, lift_b: float, width: float, thickness: float, kind: String, plane: Variant = null) -> StaticBody3D:
 	var ya: float = terrain.height_at(a.x, a.y)
 	var yb: float = terrain.height_at(b.x, b.y)
-	if plane != null:
+	if plane is String and plane == "abs":
+		# Lifts are absolute heights (city stairs and decks built from data).
+		ya = 0.0
+		yb = 0.0
+	elif plane != null:
 		ya = _plane_y(_v2(plane), a)
 		yb = _plane_y(_v2(plane), b)
 	var ta := Vector3(a.x, ya + lift_a, a.y)
@@ -388,7 +405,8 @@ func _mat(kind: String) -> StandardMaterial3D:
 	if _materials.has(kind):
 		return _materials[kind]
 	var m := StandardMaterial3D.new()
-	m.albedo_color = colors.get(kind, Color.MAGENTA)
+	# "#rrggbb" kinds give a course its own palette (city paint, buildings).
+	m.albedo_color = Color.html(kind) if kind.begins_with("#") else colors.get(kind, Color.MAGENTA)
 	m.roughness = 0.85
 	if kind in ["concrete", "ledge", "skip", "wall"]:
 		m.uv1_triplanar = true

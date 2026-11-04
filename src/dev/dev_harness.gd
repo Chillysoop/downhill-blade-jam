@@ -11,7 +11,10 @@ extends Node
 ##   --steer=<v>            during autopilot, hold this steer (-1..1) instead of lane keeping
 ##   --quit-after=<s>       quit after <s> seconds
 ##   --course=<path|test_slope>  load another course (read by main.gd)
-##   --route=<name>         autopilot follows a named course route (tucks, steers)
+##   --route=<name>         autopilot follows a named course route (tucks, steers);
+##                          a route point [x, z, kmh, hold] also caps the speed
+##                          from there on (brakes above kmh, 0 = no cap) and,
+##                          with hold > 0, holds jump that long from there (a pop)
 ##   --start-at=<x,z>       start the skater at that ground spot instead
 ##   --overview=<x,y,z,tx,ty,tz>  fixed camera at x,y,z looking at tx,ty,tz
 ##   --menu=<finish|pause|maps>  open that menu panel at --menu-at seconds
@@ -25,6 +28,9 @@ var course: CourseBuilder
 var args: Dictionary = {}
 var _route := PackedVector2Array()
 var _route_i: int = 0
+## [z, cap_kmh, hold] per route point that carries extras, in route order.
+var _route_marks: Array = []
+var _cap_kmh: float = 0.0
 var _t: float = 0.0
 var _next_tel: float = 0.0
 var _shots: Array[float] = []
@@ -63,7 +69,13 @@ func _ready() -> void:
 			return {"steer": steer, "forward": 0.0 if braking else 1.0,
 				"brake": 1.0 if braking else 0.0, "jump": jump}
 	if args.has("route") and course != null:
-		_route = CourseMath.sample_spline(course.routes.get(String(args["route"]), []), 4.0)
+		var raw: Array = course.routes.get(String(args["route"]), [])
+		var pts: Array = []
+		for q: Array in raw:
+			pts.append([q[0], q[1]])
+			if q.size() > 2:
+				_route_marks.append([float(q[1]), float(q[2]), float(q[3]) if q.size() > 3 else 0.0])
+		_route = CourseMath.sample_spline(pts, 4.0)
 		skater.input_override = _route_input
 	if args.has("start-at") and course != null:
 		var xz: PackedStringArray = String(args["start-at"]).split(",")
@@ -107,9 +119,18 @@ func _route_input() -> Dictionary:
 	var h := Vector2(skater.heading.x, skater.heading.z).normalized()
 	var err: float = h.angle_to(to)
 	var steer: float = 0.0 if absf(err) < 0.04 else clampf(err * 1.2, -1.0, 1.0)
+	while not _route_marks.is_empty() and p.y <= float(_route_marks[0][0]):
+		var mk: Array = _route_marks.pop_front()
+		_cap_kmh = float(mk[1])
+		if float(mk[2]) > 0.0:
+			_jump_held = float(mk[2])
 	var jump: bool = _jump_held > 0.0
 	var fwd: float = 1.0 if absf(err) < 0.25 else 0.0
-	return {"steer": steer, "forward": fwd, "brake": 0.0, "jump": jump}
+	var brake: float = 0.0
+	if _cap_kmh > 0.0 and skater.get_speed() * 3.6 > _cap_kmh:
+		fwd = 0.0
+		brake = 1.0
+	return {"steer": steer, "forward": fwd, "brake": brake, "jump": jump}
 
 
 func _physics_process(dt: float) -> void:

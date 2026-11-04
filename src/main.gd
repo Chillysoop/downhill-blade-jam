@@ -95,6 +95,10 @@ func _ready() -> void:
 		drag.course = course
 		add_child(drag)
 		drag.slow_ground_changed.connect(func(n: String) -> void: hud.show_slow_ground(n))
+		course.hazard_hit.connect(func(r: String) -> void: skater.bail(r))
+		course.splashed.connect(_on_splash)
+		if course.water_y > -INF:
+			skater.kill_height = course.water_y - 30.0
 
 	_setup_ghost()
 
@@ -161,6 +165,8 @@ func restart_run() -> void:
 	get_tree().paused = false
 	if menu:
 		menu.hide_menu()
+	skater.process_mode = Node.PROCESS_MODE_INHERIT
+	skater.visible = true
 	skater.set_spawn(_spawn_xform, level.get("spawn_facing"))
 	if course:
 		course.reset_progress()
@@ -306,6 +312,41 @@ func _setup_ghost() -> void:
 	add_child(ghost)
 	ghost.setup(skater, Color(col[0], col[1], col[2], col[3]))
 	ghost.track = GhostTrack.load_file(_ghost_path(), Skater.POSE_SIZE, tp)
+
+
+## Into the water: after the finish line that is the end of the run (the
+## Hillcrest Drop finish is a jump off the pier into the bay); before it, a bail.
+func _on_splash() -> void:
+	print("SPLASH ", "after finish" if finished else "before finish")
+	var splash := CPUParticles3D.new()
+	splash.one_shot = true
+	splash.emitting = true
+	splash.amount = 90
+	splash.lifetime = 1.3
+	splash.explosiveness = 0.95
+	splash.direction = Vector3.UP
+	splash.spread = 35.0
+	splash.initial_velocity_min = 4.0
+	splash.initial_velocity_max = 9.0
+	splash.scale_amount_min = 0.15
+	splash.scale_amount_max = 0.4
+	var drop := SphereMesh.new()
+	drop.radius = 0.5
+	drop.height = 1.0
+	splash.mesh = drop
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.92, 0.97, 1.0)
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	splash.material_override = m
+	add_child(splash)
+	splash.global_position = Vector3(skater.global_position.x, course.water_y, skater.global_position.z)
+	get_tree().create_timer(2.0).timeout.connect(splash.queue_free)
+	if finished:
+		skater.process_mode = Node.PROCESS_MODE_DISABLED
+		skater.visible = false
+		hud.flash("SPLASH!  " + Hud.format_time(run_time), Color(0.45, 0.85, 1.0), 4.0)
+	else:
+		skater.bail("Fell in the bay")
 
 
 func _build_environment() -> void:

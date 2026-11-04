@@ -163,3 +163,38 @@ static func ellipse_outside(p: Vector2, c: Vector2, rx: float, rz: float, yaw: f
 	var gz: float = nz / maxf(rz, 0.01)
 	var grad: float = sqrt(gx * gx + gz * gz) / r
 	return (r - 1.0) / maxf(grad, 0.0001)
+
+
+## Bilinear lookup in a level grid: [param xs] ascending column X positions,
+## [param zs] row Z positions running downhill (descending), [param ys] rows of
+## heights (ys[row][col]). Clamps outside the grid. City courses use this as
+## the lot/ground height between their streets (docs/course-data-schema.md).
+static func grid_bilinear(xs: Array, zs: Array, ys: Array, x: float, z: float) -> float:
+	var ci: int = 0
+	while ci < xs.size() - 2 and x > float(xs[ci + 1]):
+		ci += 1
+	var ri: int = 0
+	while ri < zs.size() - 2 and z < float(zs[ri + 1]):
+		ri += 1
+	var x0: float = float(xs[ci])
+	var x1: float = float(xs[mini(ci + 1, xs.size() - 1)])
+	var z0: float = float(zs[ri])
+	var z1: float = float(zs[mini(ri + 1, zs.size() - 1)])
+	var tx: float = clampf((x - x0) / (x1 - x0), 0.0, 1.0) if x1 != x0 else 0.0
+	var tz: float = clampf((z - z0) / (z1 - z0), 0.0, 1.0) if z1 != z0 else 0.0
+	var r0: Array = ys[ri]
+	var r1: Array = ys[mini(ri + 1, ys.size() - 1)]
+	var a: float = lerpf(float(r0[ci]), float(r0[mini(ci + 1, r0.size() - 1)]), tx)
+	var b: float = lerpf(float(r1[ci]), float(r1[mini(ci + 1, r1.size() - 1)]), tx)
+	return lerpf(a, b, tz)
+
+
+## Height of a street at [param p] given the segment [param a]→[param b]
+## (x, z, y points): the street is level across its width and runs straight
+## between its points, so it is the segment's height at the closest point.
+static func street_height(p: Vector2, a: Vector3, b: Vector3) -> float:
+	var a2 := Vector2(a.x, a.y)
+	var b2 := Vector2(b.x, b.y)
+	var ab: Vector2 = b2 - a2
+	var t: float = clampf((p - a2).dot(ab) / maxf(ab.length_squared(), 0.0001), 0.0, 1.0)
+	return lerpf(a.z, b.z, t)

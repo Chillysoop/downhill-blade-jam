@@ -2,6 +2,12 @@
  "schema_version": 1,
  "courses": [
   {
+   "id": "hillcrest_drop",
+   "name": "Hillcrest Drop",
+   "path": "res://assets/data/course_hillcrest_drop.json",
+   "blurb": "A steep bay city. Bomb the hill through crowded streets, find your own line, and finish with a jump off the pier into the bay."
+  },
+  {
    "id": "copperline_mountain",
    "name": "Copperline Mountain",
    "path": "res://assets/data/course_copperline_mountain.json",

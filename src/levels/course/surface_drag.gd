@@ -46,6 +46,13 @@ func _ready() -> void:
 	add_child(_dust)
 
 
+## True when the skater is standing on the course's ground grid rather than
+## a placed feature (roof, deck, sidewalk, ramp).
+func _floor_is_ground() -> bool:
+	var p: Vector3 = skater.global_position
+	return p.y < course.terrain.height_at(p.x, p.z) + 0.25
+
+
 ## Player-facing name for a slow surface key, or "" for fast ground.
 static func slow_label(key: String) -> String:
 	match key:
@@ -75,7 +82,11 @@ func _physics_process(dt: float) -> void:
 		return
 	var grounded: bool = skater.is_on_floor() and skater.state == Skater.State.GROUNDED
 	var key: String = ""
-	if grounded:
+	# Only the ground grid has surfaces; a roof, deck or sidewalk over grass is
+	# still hard and fast.
+	if grounded and not _floor_is_ground():
+		key = "concrete"
+	elif grounded:
 		key = CourseTerrain.Surface.keys()[course.surface_at(skater.global_position)].to_lower()
 	var label: String = slow_label(key) if grounded else _current
 	if skater.state == Skater.State.CRASHED:

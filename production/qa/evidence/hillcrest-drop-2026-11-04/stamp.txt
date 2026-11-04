@@ -1,0 +1,9 @@
+Reviewed-Content-Hash: tools/levels/gen_hillcrest.py 78fd39118e247478591389fac99dbb96aa10d277
+Reviewed-Content-Hash: assets/data/course_hillcrest_drop.json c14839b6b733abd2bb4a55c57e330e0ab5c652ed
+Reviewed-Content-Hash: src/levels/course/city_kit.gd 09b3407276d9ce8d7c300b1851ca6cd5b5c3be70
+Reviewed-Content-Hash: src/levels/course/building.gdshader bb67491303c8402003ba779a4b3dbaad0bd41fb6
+Reviewed-Content-Hash: src/levels/course/course_builder.gd d5ab769c50a76a2fb4d07fe0044868e84c734832
+Reviewed-Content-Hash: src/levels/course/course_terrain.gd ce508ea6d61a6d6e75fb74ffa2bc090e87ff59f6
+Reviewed-Content-Hash: src/levels/course/course_kit.gd bf0957eb7af46967093ff43e591f44053a69eb50
+Reviewed-Content-Hash: src/levels/course/surface_drag.gd 08d8edd4531621ccd836cc112898f36b15fd405a
+Reviewed-Content-Hash: src/main.gd 5f69847c1738950fe5bb0b473134ab80a5344195
