@@ -31,6 +31,7 @@ var _best_splits: Array[float] = []
 var _finish_menu_delay: float = 1.2
 var _finish_menu_timer: float = -1.0
 var _finish_prev_best: float = 0.0
+var _finish_pb: bool = false
 var _finish_prev_splits: Array[float] = []
 
 
@@ -193,6 +194,7 @@ func _on_finish(body: Node3D) -> void:
 	_finish_prev_best = best_time
 	_finish_prev_splits = _best_splits.duplicate()
 	var pb: bool = records.submit(course_id, run_time, _splits)
+	_finish_pb = pb
 	if pb:
 		best_time = run_time
 		_best_splits = _splits.duplicate()
@@ -203,7 +205,7 @@ func _on_finish(body: Node3D) -> void:
 
 
 func _show_finish_menu() -> void:
-	menu.show_finish(course_name, run_time, _finish_prev_best, _splits, _finish_prev_splits, _split_names)
+	menu.show_finish(course_name, run_time, _finish_pb, _finish_prev_best, _splits, _finish_prev_splits, _split_names)
 
 
 ## Opens the pause menu mid-run (not at the finish, which has its own screen).

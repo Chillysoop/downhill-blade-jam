@@ -61,20 +61,20 @@ func is_open() -> bool:
 	return panel != Screen.NONE
 
 
-## Results panel after crossing the finish. [param prev_best] is the best time
-## before this run (0 = none); the split arrays are seconds since the start.
-func show_finish(course_name: String, time_s: float, prev_best: float, splits: Array[float],
+## Results panel after crossing the finish. [param pb] is whether this run set
+## a new best; [param prev_best] is the best time before it (0 = none); the
+## split arrays are seconds since the start.
+func show_finish(course_name: String, time_s: float, pb: bool, prev_best: float, splits: Array[float],
 		prev_best_splits: Array[float], split_names: Array[String]) -> void:
-	_last_finish = show_finish.bind(course_name, time_s, prev_best, splits, prev_best_splits, split_names)
+	_last_finish = show_finish.bind(course_name, time_s, pb, prev_best, splits, prev_best_splits, split_names)
 	_clear()
-	var pb: bool = prev_best <= 0.0 or time_s < prev_best
 	_add_label(course_name.to_upper(), 20, Color(1, 1, 1, 0.6))
 	_add_label("NEW BEST!" if pb else "FINISH", 40, GOOD if pb else ACCENT)
 	_add_label(Hud.format_time(time_s), 64, Color.WHITE)
 	if prev_best > 0.0:
 		var d: float = time_s - prev_best
 		_add_label("Previous best  %s   (%s)" % [Hud.format_time(prev_best), Hud.format_delta(d)],
-			22, GOOD if d < 0.0 else BAD)
+			22, GOOD if pb else BAD)
 	else:
 		_add_label("First finish on this map. Now go find a faster line.", 20, Color(1, 1, 1, 0.75))
 	for i: int in splits.size():
@@ -172,7 +172,12 @@ func _open(p: Screen, focus: Button) -> void:
 	panel = p
 	_root.visible = true
 	if focus:
-		focus.grab_focus.call_deferred()
+		_focus_later.call_deferred(focus)
+
+
+func _focus_later(b: Button) -> void:
+	if is_instance_valid(b) and b.is_inside_tree():
+		b.grab_focus()
 
 
 func _clear() -> void:

@@ -46,6 +46,7 @@ func test_slower_run_is_not_saved() -> void:
 	check(not r.submit("a", 71.0, _splits([19.0])), "slower run is not a best")
 	check(is_equal_approx(r.best_time("a"), 70.0), "best unchanged by slower run")
 	check(r.best_splits("a") == _splits([20.0]), "splits unchanged by slower run")
+	check(not r.submit("a", 69.999, _splits([])), "run that reads the same is not a best")
 
 
 func test_faster_run_replaces_best_and_splits() -> void:
@@ -92,4 +93,5 @@ func test_format_delta_signs() -> void:
 	check(Hud.format_delta(-1.25) == "-1.25", "faster delta has minus")
 	check(Hud.format_delta(2.5) == "+2.50", "slower delta has plus")
 	check(Hud.format_delta(0.0) == "+0.00", "tie shows plus zero")
+	check(Hud.format_delta(-0.001) == "+0.00", "rounds-to-zero gain shows plus zero")
 	check(Hud.format_delta(-75.0) == "-1:15.00", "delta over a minute uses M:SS.cc")

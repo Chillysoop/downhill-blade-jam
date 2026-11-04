@@ -23,10 +23,15 @@ func best_splits(course_id: String) -> Array[float]:
 	return out
 
 
+## Smallest improvement that counts as a new best: the clock shows hundredths,
+## so a run that reads the same as the best is not a new one.
+const TIE_EPSILON_S: float = 0.005
+
+
 ## True when [param time_s] beats the current best (or there is none yet).
 func is_new_best(course_id: String, time_s: float) -> bool:
 	var best: float = best_time(course_id)
-	return time_s > 0.0 and (best <= 0.0 or time_s < best)
+	return time_s > 0.0 and (best <= 0.0 or time_s < best - TIE_EPSILON_S)
 
 
 ## Records a finished run. Returns true and stores it when it is a new best.

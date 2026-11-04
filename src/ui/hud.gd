@@ -80,8 +80,8 @@ static func format_time(t: float) -> String:
 
 ## Formats a time difference as +S.cc / -S.cc (M:SS.cc past a minute).
 static func format_delta(d: float) -> String:
-	var sign: String = "-" if d < 0.0 else "+"
 	var a: float = absf(d)
+	var sign: String = "-" if d < 0.0 and a >= 0.005 else "+"
 	if a >= 60.0:
 		return sign + format_time(a)
 	return "%s%.2f" % [sign, a]
