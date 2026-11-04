@@ -2,7 +2,8 @@ extends Node
 ## Registers the game's input actions at startup so keyboard and gamepad
 ## bindings live in one readable place instead of serialized project settings.
 ##
-## Actions: steer_left, steer_right, forward (push/tuck), brake, jump, restart.
+## Actions: steer_left, steer_right, forward (push/tuck), brake, jump, restart,
+## pause (opens the pause menu; menus themselves use the built-in ui_* actions).
 
 
 func _ready() -> void:
@@ -12,6 +13,7 @@ func _ready() -> void:
 	_add_action("brake", [KEY_S, KEY_DOWN], [], [[JOY_AXIS_TRIGGER_LEFT, 1.0]])
 	_add_action("jump", [KEY_SPACE], [JOY_BUTTON_A], [])
 	_add_action("restart", [KEY_R, KEY_BACKSPACE], [JOY_BUTTON_Y, JOY_BUTTON_BACK], [])
+	_add_action("pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START], [])
 
 
 ## Creates [param action] (if missing) and binds the given keys, joypad

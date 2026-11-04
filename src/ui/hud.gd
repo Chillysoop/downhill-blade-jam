@@ -32,7 +32,7 @@ func _ready() -> void:
 	hint.offset_left = 24.0
 	hint.offset_top = -44.0
 	hint.offset_bottom = -12.0
-	hint.text = "Press any control to drop in.   A/D steer   W push / tuck   S brake   Space hold+release jump (tap = hop)   R restart"
+	hint.text = "Press any control to drop in.   A/D steer   W push / tuck   S brake   Space hold+release jump (tap = hop)   R restart   Esc pause"
 	hint.modulate = Color(1, 1, 1, 0.75)
 	var build := _label(Vector2(0, 0), 14)
 	build.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
@@ -76,6 +76,15 @@ static func format_time(t: float) -> String:
 	var m: int = int(t / 60.0)
 	var s: float = t - m * 60.0
 	return "%d:%05.2f" % [m, s]
+
+
+## Formats a time difference as +S.cc / -S.cc (M:SS.cc past a minute).
+static func format_delta(d: float) -> String:
+	var a: float = absf(d)
+	var sign: String = "-" if d < 0.0 and a >= 0.005 else "+"
+	if a >= 60.0:
+		return sign + format_time(a)
+	return "%s%.2f" % [sign, a]
 
 
 func _label(pos: Vector2, size: int) -> Label:

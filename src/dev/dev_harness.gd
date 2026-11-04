@@ -14,6 +14,9 @@ extends Node
 ##   --route=<name>         autopilot follows a named course route (tucks, steers)
 ##   --start-at=<x,z>       start the skater at that ground spot instead
 ##   --overview=<x,y,z,tx,ty,tz>  fixed camera at x,y,z looking at tx,ty,tz
+##   --menu=<finish|pause|maps>  open that menu panel at --menu-at seconds
+##   --menu-at=<s>          when to open --menu (default 2)
+##   --pick-map=<id>        at --menu-at, pick that map as map select would
 ## Used for automated simulation runs and screenshot evidence.
 
 var skater: Skater
@@ -123,6 +126,16 @@ func _physics_process(dt: float) -> void:
 		print("t=%5.2f pos=(%6.1f,%6.1f,%7.1f) speed=%5.1f km/h state=%s lean=%3.0f %s" % [
 			_t, p.x, p.y, p.z, skater.get_speed() * 3.6, Skater.State.keys()[skater.state],
 			rad_to_deg(skater.lean), mode])
+	if args.has("menu") and _t >= float(args.get("menu-at", "2")):
+		var which: String = String(args["menu"])
+		args.erase("menu")
+		get_parent().call("open_menu", which)
+	if args.has("pick-map") and _t >= float(args.get("menu-at", "2")):
+		var id: String = String(args["pick-map"])
+		args.erase("pick-map")
+		if RunSession.course_id != id:
+			get_parent().call("_on_map_chosen", id)
+			return
 	if not _shots.is_empty() and _t >= _shots[0]:
 		_shots.pop_front()
 		_save_shot()
