@@ -7,7 +7,7 @@
 > **Decision (Conner):** Concept A "Braided Fan" is CHOSEN. §2 is the full layout built as the Braided Fan, designed directly against A's listed cons (see §2.0).
 > **Defaults adopted (Conner didn't object):**
 > - Grass and dirt slow you hard; only rock, trees and walls crash you.
-> - Obvious skips are hinted with paint marks; three skips are secret.
+> - ~~Obvious skips are hinted with paint marks; three skips are secret.~~ Superseded 2026-11-04, see §3.2: no lines or skips are marked.
 > - Target times: ≈65–75 s expert, ≈90–100 s normal.
 >
 > **Physics basis:** the prototype skater numbers given to this run:
@@ -368,9 +368,8 @@ Braid nodes are spaced 150–250 m apart, as on a real braided riverbed.
 ### 2.7 Skips and Shortcuts ("Optional Paths")
 Kinds: **N** = natural, **P** = placed, **G** = grind.
 
-★ marks a big skip; there are 7. Hint levels:
-- **Hinted** skips have yellow lip paint and chevrons.
-- **Secret** skips show only a small yellow crew tag, readable from the correct approach line. There are 3: Long Groove, Culvert and Spur Transfer.
+★ marks a big skip; there are 7.
+- **No skip is marked** (§3.2). "Hinted" in the table below now means only that the feature is visible from its approach; there is no lip paint, chevron or crew tag.
 
 | ID | Skip | Kind | Location | Skill needed | Saves (est.) | Risk / failure |
 |---|---|---|---|---|---|---|
@@ -489,7 +488,7 @@ Kinds: **N** = natural, **P** = placed, **G** = grind.
 
 ### 2.12 Landmarks, Wayfinding and Colour Cues
 
-**Wayfinding rule:** every braid node (D1–D10) shows each option's strand colour and its landmark at least 3 s ahead (≈75 m at 25 m/s). Islands sit below eye height at nodes, so the fan reads as one open space.
+**Wayfinding rule (revised 2026-11-04, §3.2):** lines are not marked. Every braid node (D1–D10) shows each option's *terrain and landmark* at least 3 s ahead (≈75 m at 25 m/s); the player reads the ground, not paint or poles. Islands sit below eye height at nodes, so the fan reads as one open space.
 
 | Landmark | Position | Guides |
 |---|---|---|
@@ -503,9 +502,9 @@ Kinds: **N** = natural, **P** = placed, **G** = grind.
 | Chapel spire | I8 | Visible from the Big Pan; the toe target |
 | Finish arch | (+80, −1480) | Visible from Split 3 |
 
-**Strand identity** (colour + shape + feature language, never walls):
+**Strand identity** (feature language only; the marker column is SUPERSEDED by §3.2 and was removed from the build):
 
-| Strand | Marker | Feature language |
+| Strand | ~~Marker~~ | Feature language |
 |---|---|---|
 | Blue Crown | Blue round-top poles | Wide rollers, chairlift overhead |
 | Rust | Rust-orange square posts, cart rails, lanterns | Cut channels, industrial |
@@ -517,7 +516,7 @@ Kinds: **N** = natural, **P** = placed, **G** = grind.
 
 | Meaning | Colour | Shape |
 |---|---|---|
-| Skip takeoff | Yellow lip paint | Arrow chevrons; secret skips get only a small tag |
+| ~~Skip takeoff~~ | ~~Yellow lip paint~~ | Removed (§3.2): takeoffs are plain concrete |
 | Hazard / crash | Red, red/white | Downward chevrons, netting |
 | Checkpoint / finish | Green and white | Flag towers, arch |
 | Out of bounds | Red fence | Fence plus tree wall |
@@ -607,6 +606,10 @@ The red fence on the wall contour warns about 15 m before the kill line.
 
 ## 3. Resolved Questions
 1. **Straight line slow and crashy?** Yes (Conner, 2026-11-04): "you should not be able to go straight down. This should be a hard game where you're forced to find creative lines." Keep the Straight-Line Test as a hard requirement; difficulty bias is toward demanding lines.
+2. **Mark the lines?** No (Conner, 2026-11-04): "we should not be marking lines, they should be emergent for the player to discover, and they should have lots of options to cross over and test different paths." Rule for every course:
+   - No strand poles, coloured markers, lip paint, chevrons or crew tags.
+   - Kept, because they are not route hints: red hazard tint (fairness, a crash must be readable), green/white checkpoint towers and the finish arch, landmarks and the chairlift as scenery.
+   - Lines must cross often: at least one crossover per split section linking neighbouring strands, so a rider can switch lines mid-run and test combinations.
 
 ---
 
@@ -620,4 +623,5 @@ Built from `assets/data/course_copperline_mountain.json` (schema: `docs/course-d
 - **Ore strand** swings west earlier ((−200, −685)) so it clears the crusher steps, and ends at (−115, −912) to clear the Trestle landing.
 - **Landings are sloped** for the new physics (landing impact limit 11 m/s): Needle Drop 3 m face then a 33° landing; Dry Falls Huck 3 m knuckle then a 36 m, ≈29° landing face, no kicker (paint only); Stair Falls is three 3 m rolls instead of 4 m drops.
 - **Culvert** is an open slot sunk 12 m through the band (no pipe roof yet). **Teal Rapids** starts at (+55, −425) and the Teal Split 1 pad is at x +50, clear of the Lift step-ups.
-- **Not built yet:** Chapel bell, crew tags, audio cues, the rock-gap entry dressing for the Groove, the 12 m/s respawn speed (respawn is stopped and waits for input), grinding on the rails.
+- **Emergent lines (§3.2):** strand marker poles and yellow kicker paint removed. Eight concrete crossover bands link the strands: X1 Rust→Crown (z −200..−230), X2 Crown→Teal (−180..−200), X3 Rust↔Crown↔Teal (≈−320), X8 Crown↔Teal (≈−700), X7 Ore↔Crown (−830..−852), X10 Culvert↔Crown (≈−995), X12 Huck↔Meadow↔Ramp (≈−1250), X13 Meadow↔Rim (≈−1330). A mixed line (Rust → X3 → Teal → Meadow → Ramp) rides clean; the main three lines' times are unchanged (Blue 1:27, Teal 1:39, Rust 2:04).
+- **Not built yet:** Chapel bell, audio cues, the rock-gap entry dressing for the Groove, the 12 m/s respawn speed (respawn is stopped and waits for input), grinding on the rails.

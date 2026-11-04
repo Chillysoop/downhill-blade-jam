@@ -1,0 +1,3 @@
+Reviewed-Content-Hash: assets/data/course_copperline_mountain.json ec0c4f0f6075a81a65587a2d55c60daf5bf38806
+Reviewed-Content-Hash: src/levels/course/course_kit.gd 86ba02b1c637d0e61832e7399487283461accf8b
+Reviewed-Content-Hash: design/levels/copperline-mountain.md 9638071a06410e49371d02f8b635196ed0044a9b

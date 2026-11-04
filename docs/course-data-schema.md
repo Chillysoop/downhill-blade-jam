@@ -65,7 +65,7 @@ Facing: `heading` (degrees, 0 = straight down −Z, + turns toward +X) or
 | `type` | Keys | Notes |
 |---|---|---|
 | `ramp` | `a`, `b`, `lift_a`, `lift_b`, `width`, `thickness`, `kind`, `plane` | Slab whose top runs from a to b. Landings, drop-ins |
-| `kicker` | `at`, facing, `width`, `length`, `height`, `kind` (default `skip` = yellow) | Launch ramp |
+| `kicker` | `at`, facing, `width`, `length`, `height`, `kind` (default `concrete`) | Launch ramp |
 | `stairs` | `at`, facing, `count`, `rise`, `tread`, `width`, `overlap` | Step-ups; the top step is `count × rise` above a plane that follows the base slope, so it meets an island of that height |
 | `deck` | `a`, `b`, `lift_a`, `drop`, `width`, `rails` (`[{side}]`), `pillar_spacing` | Elevated trestle on pillars |
 | `box` | `at`, facing, `size` (across, height, along), `lift`, `kind`, `collide` | Buildings, roofs, arches |
@@ -73,8 +73,8 @@ Facing: `heading` (degrees, 0 = straight down −Z, + turns toward +X) or
 | `rail` | `a`, `b`, `lift`, `kind` | Grind rail on posts (geometry until grinding exists) |
 | `boulders` | `at`, `radius`, `count`, `size_min`, `size_max`, `seed`, `kind` | Crash rocks |
 | `trees` | `at`, `radius`, `count`, `seed` **or** `margin: {z_from, z_to, u_from, u_to, spacing}` | Trees are crash obstacles |
-| `markers` | `points`, `kind` (strand colour), `shape` (`round`, `square`, `pennant`), `offset`, `spacing` | Strand poles; visual only |
+| `markers` | `points`, `kind` (strand colour), `shape` (`round`, `square`, `pennant`), `offset`, `spacing` | Strand poles; visual only. **Not used**: lines are unmarked (design/levels/copperline-mountain.md §3.2) |
 | `chairlift` | `points`, `offset`, `spacing`, `height` | Towers (solid) and cables |
 
 `kind` picks a colour from the shared colour language in `CourseKit.colors`
-(yellow `skip` = takeoff, red `hazard` = crash, green/white = checkpoint).
+(red `hazard` = crash, green/white = checkpoint). Route hints such as yellow `skip` paint are not used; see the level design §3.2.
