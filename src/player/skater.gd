@@ -173,6 +173,11 @@ func _physics_process(dt: float) -> void:
 		_air_step(dt, inp)
 	var before_move: Vector3 = velocity
 	move_and_slide()
+	# move_and_slide skips the floor snap whenever velocity points even slightly
+	# up, so rolling up any slope would lift off every other frame. Wheels on
+	# the ground stay on it within the snap reach, whichever way you roll.
+	if state == State.GROUNDED and not is_on_floor() and floor_snap_length > 0.0:
+		apply_floor_snap()
 	_restore_slope_velocity(before_move)
 	_after_move(pre_vel, dt)
 	if state != State.CRASHED:

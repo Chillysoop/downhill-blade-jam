@@ -82,15 +82,22 @@ static func apply_carve_scrub(t: SkaterTuning, v_forward: float, speed: float, t
 	return move_toward(v_forward, 0.0, t.carve_scrub * a_lat * dt)
 
 
+## Share of a push stroke's peak that the whole stroke averages (sine pulse
+## over stride_push_share, then a glide).
+static func stride_duty(t: SkaterTuning) -> float:
+	return t.stride_push_share * (2.0 / PI)
+
+
 ## Forward acceleration (m/s²) from striding at [param speed], at
 ## [param phase] (0..1) through one push stroke. Each stroke pushes in a
-## smooth pulse then glides, and pushes weaken toward stride_max_speed because
-## the foot can't push faster than the ground moves under it.
+## smooth pulse then glides. Slow, the legs' strength caps the push
+## (stride_peak_accel); faster, their power does: a = P / v, so pushes keep
+## helping at speed, just less and less, as for real skaters.
 static func stride_accel(t: SkaterTuning, speed: float, phase: float) -> float:
 	if phase < 0.0 or phase >= t.stride_push_share:
 		return 0.0
-	var falloff: float = clampf(1.0 - absf(speed) / t.stride_max_speed, 0.0, 1.0)
-	return t.stride_peak_accel * sin(PI * phase / t.stride_push_share) * falloff
+	var power_cap: float = t.stride_power / (maxf(absf(speed), 0.1) * stride_duty(t))
+	return minf(t.stride_peak_accel, power_cap) * sin(PI * phase / t.stride_push_share)
 
 
 ## Braking deceleration (m/s²) of the T-stop: light when slow, harder when
@@ -145,8 +152,7 @@ static func is_seam_normal(t: SkaterTuning, old_n: Vector3, new_n: Vector3) -> b
 ## Average forward acceleration (m/s²) over whole push strokes at
 ## [param speed]: the sine pulse during the push share, nothing while gliding.
 static func stride_avg_accel(t: SkaterTuning, speed: float) -> float:
-	var falloff: float = clampf(1.0 - absf(speed) / t.stride_max_speed, 0.0, 1.0)
-	return t.stride_peak_accel * t.stride_push_share * (2.0 / PI) * falloff
+	return minf(t.stride_peak_accel * stride_duty(t), t.stride_power / maxf(absf(speed), 0.1))
 
 
 ## Whether holding forward should stride (true) or tuck (false) at

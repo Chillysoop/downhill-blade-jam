@@ -28,6 +28,9 @@ func _init() -> void:
 	test_resistance_never_reverses(t)
 	test_pop_speed_range(t)
 	test_landing_verdicts(t)
+	test_carves_are_sharp(t)
+	test_tucked_carves_still_turn(t)
+	test_lean_is_quick(t)
 	test_slow_sideways_landing_steps_around(t)
 	test_tuck_takes_time_to_exit(t)
 	test_tuck_blends_drag_and_lean(t)
@@ -91,7 +94,7 @@ func test_slow_turns_are_capped(t: SkaterTuning) -> void:
 	var lean: float = deg_to_rad(t.lean_max_deg)
 	var v: float = 3.0
 	var w: float = SkateMath.carve_turn_rate(t, v, lean)
-	check(absf(w - v / t.min_turn_radius) < 0.001, "frame limits the tightest turn")
+	check(absf(w - maxf(v / t.min_turn_radius, t.pivot_turn_rate)) < 0.001, "footwork limits the tightest slow turn")
 	check(is_equal_approx(SkateMath.carve_turn_rate(t, 0.0, lean), t.pivot_turn_rate), "can step around when stopped")
 
 
@@ -145,9 +148,9 @@ func test_strides_fade_with_speed(t: SkaterTuning) -> void:
 	var mid: float = t.stride_push_share * 0.5
 	var at_rest: float = SkateMath.stride_accel(t, 0.0, mid)
 	check(is_equal_approx(at_rest, t.stride_peak_accel), "full push from a standstill")
-	check(SkateMath.stride_accel(t, t.stride_max_speed * 0.5, mid) < at_rest, "pushes weaken as speed rises")
-	check(SkateMath.stride_accel(t, t.stride_max_speed, mid) == 0.0, "no push at stride max speed")
-	check(SkateMath.stride_accel(t, t.stride_max_speed * 2.0, mid) == 0.0, "no push above it")
+	check(SkateMath.stride_accel(t, 8.0, mid) < at_rest, "pushes weaken as speed rises (legs have only so much power)")
+	check(SkateMath.stride_accel(t, 16.0, mid) < SkateMath.stride_accel(t, 8.0, mid), "and keep weakening")
+	check(SkateMath.stride_accel(t, 16.0, mid) >= 0.0, "a push never slows you")
 
 
 func test_strides_only_push_in_push_phase(t: SkaterTuning) -> void:
@@ -155,16 +158,32 @@ func test_strides_only_push_in_push_phase(t: SkaterTuning) -> void:
 	check(SkateMath.stride_accel(t, 0.0, (t.stride_push_share + 1.0) * 0.5) == 0.0, "glide phase does not push")
 
 
-func test_stride_takeoff_is_realistic(t: SkaterTuning) -> void:
-	# Real skaters reach ~20 km/h in a few seconds of striding on the flat.
+## Seconds of striding on the flat from a standstill to [param kmh].
+func _stride_time(t: SkaterTuning, kmh: float) -> float:
 	var v: float = 0.0
 	var time: float = 0.0
-	while v < 20.0 / 3.6 and time < 10.0:
+	while v < kmh / 3.6 and time < 30.0:
 		var phase: float = fmod(time, t.stride_period) / t.stride_period
 		v += SkateMath.stride_accel(t, v, phase) * DT
 		v = SkateMath.apply_resistance(t, v, t.drag, DT)
 		time += DT
-	check(time > 2.0 and time < 6.0, "0-20 km/h striding takes 2-6 s (took %.2f)" % time)
+	return time
+
+
+func test_stride_takeoff_is_realistic(t: SkaterTuning) -> void:
+	# A strong skater sprinting off the line: jogging pace in about a second,
+	# 20 km/h in about two, 30 km/h in about four (research in
+	# design/quick-specs/snappy-skating-2026-11-19.md).
+	var t15: float = _stride_time(t, 15.0)
+	var t20: float = _stride_time(t, 20.0)
+	var t30: float = _stride_time(t, 30.0)
+	check(t15 > 0.7 and t15 < 1.5, "0-15 km/h takes 0.7-1.5 s (took %.2f)" % t15)
+	check(t20 > 1.2 and t20 < 2.5, "0-20 km/h takes 1.2-2.5 s (took %.2f)" % t20)
+	check(t30 > 2.5 and t30 < 5.0, "0-30 km/h takes 2.5-5 s (took %.2f)" % t30)
+	# Holding W on the flat settles where push power meets drag.
+	var top: float = _stride_time(t, 60.0)
+	check(top >= 30.0, "striding on the flat tops out below 60 km/h")
+	check(_stride_time(t, 38.0) < 30.0, "a strong skater holds about 40 km/h on the flat")
 
 
 func test_braking_distances(t: SkaterTuning) -> void:
@@ -306,15 +325,16 @@ func test_stride_or_tuck(t: SkaterTuning) -> void:
 	# so you keep skating on the flat and tuck once gravity carries you.
 	check(SkateMath.prefer_stride(t, 4.0, false), "stride when slow")
 	check(SkateMath.prefer_stride(t, 8.0, false), "still striding at ~29 km/h")
-	check(not SkateMath.prefer_stride(t, 15.0, false), "tuck at 54 km/h")
-	check(not SkateMath.prefer_stride(t, t.stride_max_speed, false), "tuck once pushes stop helping")
+	check(SkateMath.prefer_stride(t, 12.0, false), "still pushing at 43 km/h, as sprinters do")
+	check(not SkateMath.prefer_stride(t, 20.0, false), "tuck at 72 km/h")
+	check(not SkateMath.prefer_stride(t, 25.0, false), "tuck at 90 km/h")
 	# Hysteresis: near the switch speed, keep doing what you were doing.
 	var v: float = 0.0
 	while SkateMath.prefer_stride(t, v, false) and v < 30.0:
 		v += 0.01
 	check(SkateMath.prefer_stride(t, v - 0.05, false), "just below the switch you stride")
 	check(not SkateMath.prefer_stride(t, v - 0.05, true), "already tucked just below it, you stay tucked")
-	check(SkateMath.stride_avg_accel(t, 0.0) > 1.5 and SkateMath.stride_avg_accel(t, 0.0) < 3.0, "average push from standing is 1.5-3 m/s²")
+	check(SkateMath.stride_avg_accel(t, 0.0) > 2.5 and SkateMath.stride_avg_accel(t, 0.0) < 4.5, "average push from standing is 2.5-4.5 m/s² (a sprint start)")
 
 
 func test_flatter_normal_is_never_a_seam(t: SkaterTuning) -> void:
@@ -375,3 +395,32 @@ func test_pumping_gains_only_with_timing(t: SkaterTuning) -> void:
 	var bad: float = SkateMath.pump_speed(t, SkateMath.pump_speed(t, 10.0, 1.0, 0.6 * t.gravity), -1.0, -0.5 * t.gravity)
 	check(bad < 10.0, "badly timed pump costs speed")
 	check(SkateMath.pump_speed(t, 0.1, 1.0, 3.0 * t.gravity) >= 0.0, "pumping never makes speed negative")
+
+
+func test_carves_are_sharp(t: SkaterTuning) -> void:
+	# At 30 km/h a full carve turns in a ~6 m radius and the wheels hold it.
+	var v: float = 30.0 / 3.6
+	var w: float = SkateMath.carve_turn_rate(t, v, deg_to_rad(t.lean_max_deg))
+	var radius: float = v / w
+	check(radius < 6.5, "full carve at 30 km/h is under 6.5 m radius (%.1f)" % radius)
+	check(SkateMath.grip_usage(t, v, w, 0.0) <= 1.0, "and the wheels hold it")
+	# Slow footwork: you can turn on the spot.
+	check(SkateMath.carve_turn_rate(t, 0.5, deg_to_rad(t.lean_max_deg)) >= 2.5, "pivot at walking pace is quick")
+	check(SkateMath.carve_turn_rate(t, 3.0, deg_to_rad(t.lean_max_deg)) * 1.0 >= 3.0 / 1.25, "tightest slow circle is about a metre")
+
+
+func test_tucked_carves_still_turn(t: SkaterTuning) -> void:
+	# Downhill skaters carve from a tuck: at 50 km/h a full tucked carve is a
+	# ~30 m radius, not a highway bend.
+	var v: float = 50.0 / 3.6
+	var w: float = SkateMath.carve_turn_rate(t, v, SkateMath.lean_limit(t, 1.0))
+	check(v / w < 32.0, "tucked carve at 50 km/h is under 32 m radius (%.1f)" % (v / w))
+
+
+func test_lean_is_quick(t: SkaterTuning) -> void:
+	var lean: float = 0.0
+	var time: float = 0.0
+	while lean < deg_to_rad(t.lean_max_deg) - 0.001 and time < 1.0:
+		lean = SkateMath.step_lean(t, lean, 1.0, 0.0, DT)
+		time += DT
+	check(time <= 0.16, "edge to full lean in under 0.16 s (%.2f)" % time)

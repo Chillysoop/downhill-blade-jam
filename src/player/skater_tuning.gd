@@ -34,7 +34,7 @@ extends Resource
 @export var air_drag: float = 0.0041
 ## Holding forward strides while a push adds more speed than tucking would
 ## save, and tucks once it doesn't. This margin (share) stops it flickering
-## between the two near the switch, which is about 36 km/h on any slope.
+## between the two near the switch, which is about 60 km/h on any slope.
 @export var stride_tuck_hysteresis: float = 0.15
 ## Seconds to fold all the way down into a tuck.
 @export var tuck_in_time: float = 0.3
@@ -43,28 +43,37 @@ extends Resource
 @export var tuck_out_time: float = 0.5
 
 @export_group("Striding")
-## Seconds per push stroke (one leg). Real recreational cadence is ~0.6-0.8 s.
+## Seconds per push stroke (one leg). Elite skaters stroke ~1.3 times a
+## second (Houdijk et al. 2000); 0.65 s is a strong, quick cadence.
 @export var stride_period: float = 0.65
 ## Share of each stroke spent pushing; the rest is the glide and recovery.
-@export var stride_push_share: float = 0.6
-## Peak push acceleration (m/s²) from a standstill, at the middle of a push.
-@export var stride_peak_accel: float = 5.5
-## Speed (m/s) at which a push stops helping: the foot can't push faster than
-## the ground moves under it. About 40 km/h, a strong skater on the flat.
-@export var stride_max_speed: float = 11.0
+## A sprinting skater barely glides.
+@export var stride_push_share: float = 0.7
+## Peak push acceleration (m/s²) at the middle of a push, when slow: the legs'
+## strength limit. 7.4 averages ~3.3 m/s² over a stroke, a sprint start
+## (15 km/h in ~1.3 s, 20 km/h in ~2 s).
+@export var stride_peak_accel: float = 7.4
+## Leg power per kg of skater (W/kg), averaged over strokes. Above walking
+## pace the push is power-limited (a = P / v). Sprinters make 14-15 W/kg for
+## 30 s and 10-11 W/kg over a minute (Stangier et al. 2016); 10 W/kg holds
+## about 45 km/h on the flat, where elite inline skaters cruise at 40-50.
+@export var stride_power: float = 10.0
 
 @export_group("Carving")
 ## Steepest lean onto the edges (degrees) at full steer. A balanced carve
-## turns with lateral g = tan(lean), so 46° is a 1.04 g carve: just inside
-## the wheels' grip when slow, just past it at high speed.
-@export var lean_max_deg: float = 46.0
-## Steepest lean while tucked; a tuck only allows gentle carves.
-@export var lean_max_tuck_deg: float = 22.0
-## How fast the body rolls onto its edges, degrees per second.
-@export var lean_rate_deg: float = 260.0
-## Sideways grip of the wheels as a friction coefficient (urethane: ~0.9-1.1).
+## turns with lateral g = tan(lean), so 50° is a 1.2 g carve (a 6 m circle
+## at 30 km/h): inside the wheels' grip when slow, past it at high speed.
+@export var lean_max_deg: float = 50.0
+## Steepest lean while tucked. Downhill skaters still carve from a tuck,
+## about 0.7 g (a 27 m arc at 50 km/h).
+@export var lean_max_tuck_deg: float = 36.0
+## How fast the body rolls onto its edges, degrees per second (full lean in
+## about 0.15 s, a quick edge change).
+@export var lean_rate_deg: float = 340.0
+## Sideways grip of the wheels as a friction coefficient. Soft (82-85A)
+## outdoor urethane on smooth concrete grips about 1.2-1.3.
 ## Asking for more turn than this makes the skates slide.
-@export var side_grip: float = 1.05
+@export var side_grip: float = 1.25
 ## Above this speed (m/s) the wheels start to lose grip (chatter and
 ## vibration), so a full-lock carve at speed washes wide. About 43 km/h.
 @export var grip_fade_start: float = 12.0
@@ -77,10 +86,10 @@ extends Resource
 ## Speed lost to wheel scrub while carving, as a share of the lateral g.
 ## Sharper turns cost more speed.
 @export var carve_scrub: float = 0.04
-## Tightest turning circle radius (m) the frame allows at low speed.
-@export var min_turn_radius: float = 1.6
+## Tightest turning circle radius (m) at low speed, with a scissored stance.
+@export var min_turn_radius: float = 1.2
 ## Turn rate (rad/s) when nearly stopped, by stepping the skates around.
-@export var pivot_turn_rate: float = 1.8
+@export var pivot_turn_rate: float = 3.0
 
 @export_group("Braking")
 ## T-stop deceleration (m/s²): the trailing skate dragged sideways behind the
