@@ -78,13 +78,14 @@ var _wobble_t: float = 0.0
 var _visual: Node3D
 var _body_pivot: Node3D
 var _feet: Array[Node3D] = []
-var _base_snap: float = 0.45
+var _base_snap: float = 0.05
 
 
 func _ready() -> void:
 	if tuning == null:
 		tuning = load("res://assets/data/skater_tuning.tres") as SkaterTuning
 	floor_max_angle = deg_to_rad(55.0)
+	_base_snap = SkateMath.snap_length(tuning, 1.0 / float(Engine.physics_ticks_per_second))
 	floor_snap_length = _base_snap
 	floor_constant_speed = false
 	floor_stop_on_slope = false
@@ -230,7 +231,7 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var fwd_in: float = inp["forward"]
 	var brake_in: float = inp["brake"]
 	var braking: bool = brake_in > 0.05
-	tucking = fwd_in > 0.1 and speed > t.tuck_speed and not braking
+	tucking = fwd_in > 0.1 and not braking and not SkateMath.prefer_stride(t, speed, tucking)
 	tuck_amount = SkateMath.step_tuck(t, tuck_amount, tucking, dt)
 	striding = fwd_in > 0.1 and not tucking and not braking and tuck_amount < 0.3
 	# Hard T-stop above hard_brake_speed; keep sliding down to half of it so it
@@ -302,6 +303,20 @@ func _air_step(dt: float, inp: Dictionary) -> void:
 ## move_and_slide() strips the downhill (vertical) part of velocity while on
 ## the floor, which would bleed speed every frame. Put it back by carrying the
 ## pre-move velocity along the new floor, unless we hit a wall this step.
+## Normal of the ground under the skater. A ray straight down finds the face
+## the wheels are on; the collider's own floor normal can be a box corner or a
+## stair edge, which would tilt the skater's idea of the slope.
+func _surface_normal() -> Vector3:
+	var from: Vector3 = global_position + Vector3.UP * 0.4
+	var q := PhysicsRayQueryParameters3D.create(from, global_position + Vector3.DOWN * 0.6, collision_mask, [get_rid()])
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(q)
+	if not hit.is_empty():
+		var n: Vector3 = hit["normal"]
+		if n.angle_to(Vector3.UP) <= floor_max_angle:
+			return n.normalized()
+	return get_floor_normal()
+
+
 func _restore_slope_velocity(before_move: Vector3) -> void:
 	if not is_on_floor() or state != State.GROUNDED:
 		return
@@ -311,10 +326,11 @@ func _restore_slope_velocity(before_move: Vector3) -> void:
 			return
 	# A seam or box corner can report a floor normal far steeper than the
 	# ground either side of it; steering the speed along it flings the skater.
-	if SkateMath.is_seam_normal(tuning, ground_normal, get_floor_normal()):
+	var fn: Vector3 = _surface_normal()
+	if SkateMath.is_seam_normal(tuning, ground_normal, fn):
 		velocity = before_move
 		return
-	var along: Vector3 = SkateMath.project_on_plane(before_move, get_floor_normal())
+	var along: Vector3 = SkateMath.project_on_plane(before_move, fn)
 	if along.length() > 0.001:
 		velocity = along.normalized() * before_move.length()
 
@@ -331,7 +347,7 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 				return
 
 	if is_on_floor():
-		var n: Vector3 = get_floor_normal()
+		var n: Vector3 = _surface_normal()
 		if state == State.AIR and air_time > 0.12:
 			var verdict: Dictionary = SkateMath.judge_landing(tuning, heading, pre_vel, n)
 			if not verdict["ok"]:

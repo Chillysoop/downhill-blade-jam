@@ -22,7 +22,7 @@
 
 ## Controls — simple and intuitive
 - **Steer:** left stick / A-D. You lean onto your edges and carve: the faster you go the wider the arc, and sharper carves scrub a little speed. Turning never adds speed.
-- **Push / tuck:** hold a trigger / W. When slow you skate stride after stride (strides stop helping around 30 km/h); when fast you tuck for less drag and gentler carves.
+- **Push / tuck:** hold a trigger / W. You skate stride after stride for as long as a push still adds more speed than tucking would (up to about 36 km/h, so you keep skating on flats); once gravity is doing the work you tuck for less drag and gentler carves. Standing up out of a tuck takes half a second.
 - **Brake:** hold a trigger / S. When slow, a T-stop: one skate dragged crosswise behind the other. When fast, the reverse: the crosswise skate goes in front and bites harder. Real stopping distances.
 - **Jump:** hold to crouch, release to pop. A longer hold gives a bigger pop. A quick tap is a small hop.
 - **Hop combos:** hops are cheap and quick on blades. Releasing jump just before you land pops again the moment you touch down, so hops chain. Well-timed hops up step-ups, curbs and off the tops of rollers are a core speedrun skill.

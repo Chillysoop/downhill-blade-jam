@@ -15,6 +15,11 @@ extends Resource
 ## skater was just rolling on, within one physics step, is a collision seam
 ## or box corner and is ignored. Real slope breaks on the courses are smaller.
 @export var max_normal_jump_deg: float = 30.0
+## How far (m) the legs and wheels can reach down to stay on the ground in one
+## physics step, on top of what gravity pulls you down in that step. Ground
+## that drops away faster (a stair edge, a curb, a sharp crest at speed)
+## launches you instead of gluing you to it.
+@export var snap_absorb: float = 0.04
 
 @export_group("Rolling")
 ## Rolling resistance as a fraction of gravity. Urethane wheels on smooth
@@ -27,8 +32,10 @@ extends Resource
 @export var drag_tuck: float = 0.00225
 ## Air drag while airborne (body extended, same as standing).
 @export var air_drag: float = 0.0041
-## Holding forward below this speed (m/s) strides; above it, it tucks.
-@export var tuck_speed: float = 7.5
+## Holding forward strides while a push adds more speed than tucking would
+## save, and tucks once it doesn't. This margin (share) stops it flickering
+## between the two near the switch, which is about 36 km/h on any slope.
+@export var stride_tuck_hysteresis: float = 0.15
 ## Seconds to fold all the way down into a tuck.
 @export var tuck_in_time: float = 0.3
 ## Seconds to stand back up out of a full tuck. Until you are up you have
@@ -43,8 +50,8 @@ extends Resource
 ## Peak push acceleration (m/s²) from a standstill, at the middle of a push.
 @export var stride_peak_accel: float = 5.5
 ## Speed (m/s) at which a push stops helping: the foot can't push faster than
-## the ground moves under it. About 32 km/h for a strong skater on the flat.
-@export var stride_max_speed: float = 9.0
+## the ground moves under it. About 40 km/h, a strong skater on the flat.
+@export var stride_max_speed: float = 11.0
 
 @export_group("Carving")
 ## Steepest lean onto the edges (degrees) at full steer. A balanced carve

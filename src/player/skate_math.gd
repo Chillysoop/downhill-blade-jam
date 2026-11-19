@@ -134,8 +134,38 @@ static func landing_heading(t: SkaterTuning, heading: Vector3, velocity: Vector3
 ## True when a floor normal [param new_n] differs from the ground the
 ## skater was rolling on ([param old_n]) by more than max_normal_jump_deg in
 ## one step: a collision seam or box corner, not real ground.
+## A normal that is flatter than the old one is always real ground, so a stale
+## steep normal can never get stuck.
 static func is_seam_normal(t: SkaterTuning, old_n: Vector3, new_n: Vector3) -> bool:
+	if new_n.angle_to(Vector3.UP) <= old_n.angle_to(Vector3.UP):
+		return false
 	return rad_to_deg(old_n.angle_to(new_n)) > t.max_normal_jump_deg
+
+
+## Average forward acceleration (m/s²) over whole push strokes at
+## [param speed]: the sine pulse during the push share, nothing while gliding.
+static func stride_avg_accel(t: SkaterTuning, speed: float) -> float:
+	var falloff: float = clampf(1.0 - absf(speed) / t.stride_max_speed, 0.0, 1.0)
+	return t.stride_peak_accel * t.stride_push_share * (2.0 / PI) * falloff
+
+
+## Whether holding forward should stride (true) or tuck (false) at
+## [param speed]: stride while a push adds more speed than a tuck's lower drag
+## would save. [param tucking] is the current choice, kept near the switch.
+static func prefer_stride(t: SkaterTuning, speed: float, tucking: bool) -> bool:
+	var push: float = stride_avg_accel(t, speed)
+	var tuck_saving: float = (t.drag - t.drag_tuck) * speed * speed
+	var margin: float = t.stride_tuck_hysteresis
+	if tucking:
+		return push > tuck_saving * (1.0 + margin)
+	return push > tuck_saving * (1.0 - margin)
+
+
+## Floor snap distance (m) for one physics step of [param dt]: what gravity
+## pulls you down in that step plus what the legs can reach. Anything further
+## below is air.
+static func snap_length(t: SkaterTuning, dt: float) -> float:
+	return t.snap_absorb + 0.5 * t.gravity * dt * dt
 
 
 ## Pop speed for a jump charged for [param charge] (0..1).

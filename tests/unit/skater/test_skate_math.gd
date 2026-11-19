@@ -36,6 +36,9 @@ func _init() -> void:
 	test_grip_usage(t)
 	test_edge_level()
 	test_seam_normals(t)
+	test_stride_or_tuck(t)
+	test_flatter_normal_is_never_a_seam(t)
+	test_snap_follows_only_what_gravity_can(t)
 	print("SkateMath tests: %s" % ("PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
@@ -280,3 +283,31 @@ func test_seam_normals(t: SkaterTuning) -> void:
 	var corner_50: Vector3 = Vector3.UP.rotated(Vector3.RIGHT, deg_to_rad(-50.0))
 	check(not SkateMath.is_seam_normal(t, flat, break_20), "a 20 degree slope break is real ground")
 	check(SkateMath.is_seam_normal(t, flat, corner_50), "a 50 degree jump is a seam")
+
+
+func test_stride_or_tuck(t: SkaterTuning) -> void:
+	# Holding forward strides while a push still beats the drag a tuck saves,
+	# so you keep skating on the flat and tuck once gravity carries you.
+	check(SkateMath.prefer_stride(t, 4.0, false), "stride when slow")
+	check(SkateMath.prefer_stride(t, 8.0, false), "still striding at ~29 km/h")
+	check(not SkateMath.prefer_stride(t, 15.0, false), "tuck at 54 km/h")
+	check(not SkateMath.prefer_stride(t, t.stride_max_speed, false), "tuck once pushes stop helping")
+	# Hysteresis: near the switch speed, keep doing what you were doing.
+	var v: float = 0.0
+	while SkateMath.prefer_stride(t, v, false) and v < 30.0:
+		v += 0.01
+	check(SkateMath.prefer_stride(t, v - 0.05, false), "just below the switch you stride")
+	check(not SkateMath.prefer_stride(t, v - 0.05, true), "already tucked just below it, you stay tucked")
+	check(SkateMath.stride_avg_accel(t, 0.0) > 1.5 and SkateMath.stride_avg_accel(t, 0.0) < 3.0, "average push from standing is 1.5-3 m/s²")
+
+
+func test_flatter_normal_is_never_a_seam(t: SkaterTuning) -> void:
+	var steep: Vector3 = Vector3.UP.rotated(Vector3.RIGHT, deg_to_rad(-45.0))
+	check(not SkateMath.is_seam_normal(t, steep, Vector3.UP), "rolling from a stale steep normal onto flat ground is real")
+	check(SkateMath.is_seam_normal(t, Vector3.UP, steep), "a sudden 45 degree normal under flat ground is a seam")
+
+
+func test_snap_follows_only_what_gravity_can(t: SkaterTuning) -> void:
+	var snap: float = SkateMath.snap_length(t, 1.0 / 60.0)
+	check(snap > 0.0 and snap < 0.1, "snap is a few centimetres, not a stair step (%.3f m)" % snap)
+	check(snap < 0.17, "a 17 cm stair drop is never glued down")
