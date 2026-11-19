@@ -33,7 +33,7 @@
 
 ### 3.1 Grid
 
-- **Downhill streets** (X): Quarry St −250, Vesper St −125, Hillcrest Ave 0, Juniper St 125, Tidewater St 250.
+- **Downhill streets** (X): Quarry St −250, Vesper St −125, Hillcrest Ave 0, Juniper St 125, Tidewater St 250. These are the column lines; since the hold-forward pass (§10c) each block of street sits 16 m left or right of its line, alternating, so the streets jog at every cross street.
 - **Cross streets** (Z): Crest Way −40, Alta St −150, Sacra St −260, Pine Terrace −370, Larch St −480, Fogline St −590, Wharf Hill St −700, Lower Court −810, Shore St −920; then the **Bayfront** promenade at −1000 (26 m wide) and the **seawall** at −1013.
 - Streets are 12 m curb to curb with 3.5 m raised sidewalks (0.15 m curbs); building line 9.5 m from the centre line.
 - **Start:** Summit Park plaza (0, 26, y 9). The drop-in runs down Hillcrest Ave to Crest Way at about 18%.
@@ -111,6 +111,8 @@ Nothing marks a line: no yellow paint, no arrows, no route poles. Only normal ro
 
 ### 4.3 Intended line families (to be confirmed by playtest timing)
 
+(Since §10c every one of these lines turns at every cross street.)
+
 1. **Hillcrest bomb + House Jump:** drop-in → Hillcrest → speed-check → House Jump → lower Hillcrest → Larch → Hillcrest → gap the Steps → Hillcrest to the Bayfront → pier.
 2. **The Wall:** Crest Way left → Vesper → big crown at Alta → The Wall → Rope Alley or Vesper down.
 3. **Cable car street:** Juniper all the way, threading the oncoming cable cars; Fog Alley crossover to the Steps.
@@ -174,7 +176,29 @@ Conner: *"make the levels way more fluid and open form"*, *"think mx vs atv big 
 - **Dressing (sparse, lines stay free):** parks get two smooth mounds (1.6-3 m) and tree clumps; plazas get a shallow bowl (2.4 m deep), a fountain, benches and a few people; parking lots have bays running downhill with wide aisles.
 - **The hill ebbs:** every intersection height gets a sideways lean of up to ±7 m at the grid edges that swings left-right-left over 520 m down the hill (`EBB_AMP`, `EBB_WAVELENGTH`). Cross streets now slope one way then the other, the low side of the hill wanders, and the steepest street changes block to block (e.g. Tidewater runs 12, 22, 16, 5, 11, 20, 22% while Quarry runs 10, 5, 13, 24, 22, 11, 4%). No block drops less than 4 m, so nothing goes uphill and there are still no dead ends.
 - Hillcrest Ave (x = 0) is the pivot of the lean, so the House Jump and the Steps keep their numbers.
-- Test bot: diagonal "open" route through the chain rides at 40-48 km/h across the blocks; it stalls only where it steers into parked bays or trees (it doesn't dodge).
+- Test bot: diagonal "open" route through the chain rides at 40-48 km/h across the blocks; it stalls only where it steers into parked bays or trees (it doesn't dodge). (Superseded by §10c: the open blocks are now obstacle fields, and that route was removed.)
+
+## 10c. Hold-forward pass (2026-11-19)
+
+Conner: *"i can just hold forward and finish. that is antithetical to the game. Lots of obstacles, lots of turning, lots of finding good lines"*. Confirmed before the change: a bot that only holds forward from the summit finished in 1:25.44.
+
+- **Jogged intersections** (`JOG`, `block_off`, `bx`): every block of every downhill street is offset 16 m left or right of its column line, alternating block to block and street to street, like the offset intersections of a real hill town. Riding straight across a cross street puts you into the buildings (or an open block's obstacle field) on the far side. To keep going you turn onto the cross street and turn down again, or take a diagonal (alley or open block). The jog moves you 32 m across a 19 m cross street, so you have to set it up: brake or carve before the corner, or arrive fast and bail into a wall.
+- **Intersections are longer** (`IX_HALF` = 25.5 m either side of the column line): the level part of each cross street covers both mouths of the jog. Parked cars on the cross streets start only beyond it, and the corners have **curb cuts** (`CURB_CUT` 4 m flush), so a tight, well-judged jog never trips you on a curb.
+- **Only the House Jump stays straight:** Hillcrest's Sacra and Pine Terrace blocks (`STRAIGHT_BLOCKS`) keep their line, so the driveway run-up still works, but you have to reach Sacra through two jogs first.
+- **Open-block obstacle fields** (`FIELD_*`): staggered rows of props 5 m wide every 10 m, offset half a pitch row to row, a row every 13 m down the slope, so no straight line crosses a block. Parks: hedges and boulders. Plazas: planters and benches. Parking lots: cars and kerbed islands. About 30% are low (0.25-0.55 m) and can be hopped instead of weaved round. The fields stay 9 m inside each block, so the edges remain open to roll into.
+- **Street works** (`WORKS_*`): one barricaded dig per ordinary block, 6.5 m × 8 m, sitting over the middle of the road on alternating sides, with parked cars kept clear of it. That leaves about a 5 m lane, so you steer inside the blocks too.
+- **The drop-in now T-junctions** at Crest Way: the first decision (left or right, and how hard to brake) comes 10 seconds in.
+
+**Proof (headless bots, people and traffic removed so only the streets can stop them):**
+
+| Bot | Result |
+|---|---|
+| Hold forward from the summit | Hits the building across Crest Way at ≈ 47 km/h after 9.6 s, every attempt |
+| Hold forward from the top of every downhill block, facing straight down (44 starts, `tools/levels/hold_forward_sweep.sh`) | 31 hit an obstacle within 6-15 s, the other 13 come to a stop against a curb or wall. None gets past the next cross street, except the start above the House Jump, which flies the house and then crashes at the next jog (Larch). Furthest ride: 214 m (the House Jump), typical 25-40 m. `production/qa/evidence/hillcrest-hold-forward-2026-11-19/sweep.txt` |
+| Steering bot, House Jump line (`--route=house`) | Finishes 2:26.82 |
+| Steering bot, Juniper all the way (`--route=juniper`) | Finishes 3:02.63 |
+
+The steering bot slows to 24 km/h before every jog and can't carve or drift, so a good player should be well under these times. The House Jump line is 36 s faster than Juniper, so the skip pays off.
 
 ## 11. Playtest notes (test bot, greybox v1)
 

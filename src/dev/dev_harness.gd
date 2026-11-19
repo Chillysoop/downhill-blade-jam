@@ -16,6 +16,9 @@ extends Node
 ##                          from there on (brakes above kmh, 0 = no cap) and,
 ##                          with hold > 0, holds jump that long from there (a pop)
 ##   --start-at=<x,z>       start the skater at that ground spot instead
+##   --face-down            with --start-at: face straight down the hill (-Z)
+##   --no-people            remove city crowds and traffic (bots cannot dodge them)
+##   --lookahead=<m>        how far ahead a --route bot aims (default 18; tight city corners want ~10)
 ##   --overview=<x,y,z,tx,ty,tz>  fixed camera at x,y,z looking at tx,ty,tz
 ##   --menu=<finish|pause|maps>  open that menu panel at --menu-at seconds
 ##   --menu-at=<s>          when to open --menu (default 2)
@@ -68,6 +71,8 @@ func _ready() -> void:
 			var braking: bool = args.has("brake-at") and _t >= float(args["brake-at"])
 			return {"steer": steer, "forward": 0.0 if braking else 1.0,
 				"brake": 1.0 if braking else 0.0, "jump": jump}
+	if args.has("no-people") and course != null and course._kit != null and course._kit._city != null:
+		course._kit._city.remove_people_and_traffic()
 	if args.has("route") and course != null:
 		var raw: Array = course.routes.get(String(args["route"]), [])
 		var pts: Array = []
@@ -82,6 +87,8 @@ func _ready() -> void:
 		var p := Vector2(float(xz[0]), float(xz[1]))
 		var pos := Vector3(p.x, course.terrain.height_at(p.x, p.y) + 0.4, p.y)
 		var ahead := Vector3(course.terrain.axis_at(p.y - 20.0), pos.y, p.y - 20.0)
+		if args.has("face-down"):   # straight down the hill (-Z), not toward the course axis
+			ahead.x = pos.x
 		skater.set_spawn(Transform3D(Basis.IDENTITY, pos), (ahead - pos) * Vector3(1, 0, 1))
 		skater.respawn()
 		for i: int in _route.size():
@@ -109,8 +116,9 @@ func _ready() -> void:
 
 func _route_input() -> Dictionary:
 	var p := Vector2(skater.global_position.x, skater.global_position.z)
-	# Advance along the route; aim at a point ~18 m ahead.
-	while _route_i < _route.size() - 1 and p.distance_to(_route[_route_i]) < 18.0:
+	# Advance along the route; aim at a point --lookahead m ahead (default 18).
+	var look: float = float(args.get("lookahead", "18"))
+	while _route_i < _route.size() - 1 and p.distance_to(_route[_route_i]) < look:
 		_route_i += 1
 	while _route_i < _route.size() - 1 and _route[_route_i].y > p.y + 2.0:
 		_route_i += 1

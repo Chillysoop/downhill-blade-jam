@@ -1,0 +1,44 @@
+b0_0 start_z=-51.5 lowest_z=-80.9 first_crash=7.83 Hit an obstacle 
+b0_1 start_z=-51.5 lowest_z=-87.5 first_crash=8.11 Hit an obstacle 
+b0_2 start_z=-51.5 lowest_z=-86.3 first_crash=14.61 Hit an obstacle 
+b0_3 start_z=-51.5 lowest_z=-87.1 first_crash=8.25 Hit an obstacle 
+b0_4 start_z=-51.5 lowest_z=-84.8 first_crash=8.13 Hit an obstacle 
+b1_0 start_z=-161.5 lowest_z=-190.5 first_crash=none 
+b1_1 start_z=-161.5 lowest_z=-196.1 first_crash=14.32 Hit an obstacle 
+b1_2 start_z=-161.5 lowest_z=-197.4 first_crash=14.52 Hit an obstacle 
+b1_3 start_z=-161.5 lowest_z=-189.5 first_crash=7.15 Hit an obstacle 
+b1_4 start_z=-161.5 lowest_z=-188.2 first_crash=7.08 Hit an obstacle 
+b2_0 start_z=-271.5 lowest_z=-294.7 first_crash=7.02 Hit an obstacle 
+b2_1 start_z=-271.5 lowest_z=-296.7 first_crash=none 
+b2_2 start_z=-271.5 lowest_z=-485.7 first_crash=20.10 Hit an obstacle 
+b2_3 start_z=-271.5 lowest_z=-296.8 first_crash=7.03 Hit an obstacle 
+b2_4 start_z=-271.5 lowest_z=-297.0 first_crash=13.79 Hit an obstacle 
+b3_0 start_z=-381.5 lowest_z=-420.3 first_crash=7.89 Hit an obstacle 
+b3_1 start_z=-381.5 lowest_z=-414.4 first_crash=7.62 Hit an obstacle 
+b3_3 start_z=-381.5 lowest_z=-403.4 first_crash=none 
+b3_4 start_z=-381.5 lowest_z=-412.1 first_crash=none 
+b4_0 start_z=-491.5 lowest_z=-513.6 first_crash=6.51 Hit an obstacle 
+b4_1 start_z=-491.5 lowest_z=-514.2 first_crash=6.65 Hit an obstacle 
+b4_2 start_z=-491.5 lowest_z=-525.9 first_crash=7.97 Hit an obstacle 
+b4_3 start_z=-491.5 lowest_z=-517.4 first_crash=14.06 Hit an obstacle 
+b4_4 start_z=-491.5 lowest_z=-528.7 first_crash=8.57 Hit an obstacle 
+b5_0 start_z=-601.5 lowest_z=-638.0 first_crash=15.27 Hit an obstacle 
+b5_1 start_z=-601.5 lowest_z=-639.4 first_crash=8.55 Hit an obstacle 
+b5_3 start_z=-601.5 lowest_z=-629.2 first_crash=6.98 Hit an obstacle 
+b5_4 start_z=-601.5 lowest_z=-629.0 first_crash=7.09 Hit an obstacle 
+b6_0 start_z=-711.5 lowest_z=-737.9 first_crash=none 
+b6_1 start_z=-711.5 lowest_z=-742.1 first_crash=none 
+b6_2 start_z=-711.5 lowest_z=-737.3 first_crash=none 
+b6_3 start_z=-711.5 lowest_z=-749.1 first_crash=8.41 Hit an obstacle 
+b6_4 start_z=-711.5 lowest_z=-744.0 first_crash=7.45 Hit an obstacle 
+b7_0 start_z=-821.5 lowest_z=-856.3 first_crash=8.62 Hit an obstacle 
+b7_1 start_z=-821.5 lowest_z=-848.8 first_crash=none 
+b7_2 start_z=-821.5 lowest_z=-845.0 first_crash=none 
+b7_3 start_z=-821.5 lowest_z=-852.0 first_crash=none 
+b7_4 start_z=-821.5 lowest_z=-856.3 first_crash=8.55 Hit an obstacle 
+b8_0 start_z=-931.5 lowest_z=-952.2 first_crash=6.37 Hit an obstacle 
+b8_1 start_z=-931.5 lowest_z=-952.1 first_crash=none 
+b8_2 start_z=-931.5 lowest_z=-945.2 first_crash=none 
+b8_3 start_z=-931.5 lowest_z=-945.5 first_crash=none 
+b8_4 start_z=-931.5 lowest_z=-951.7 first_crash=none 
+summit start_z=20 lowest_z=-49.3 first_crash=8.40 Hit an obstacle 

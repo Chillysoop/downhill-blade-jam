@@ -112,6 +112,18 @@ PIER_END_Z = -1104.0
 PIER_W = 12.0
 FINISH_Z = -1102.5
 
+# --- Obstacles (hold-forward pass, 2026-11-19) -----------------------------------
+FIELD_EDGE = 9.0        # open-block fields stay this far inside the block (streets stay clear)
+FIELD_PITCH = 10.0      # prop spacing across the slope
+FIELD_PROP_W = 5.0      # prop width: half the pitch, so two staggered rows leave no straight gap
+FIELD_ROW_GAP = 13.0    # rows down the slope
+FIELD_LOW_SHARE = 0.3   # share of props low enough to hop (about 0.5 m) instead of weave round
+WORKS_W = 6.5           # street works: barricade width across the road
+WORKS_L = 8.0           # and length along it
+WORKS_OFFSET = 2.4      # centre this far off the crown, so it covers the middle of the road
+works_zones = []        # (x, z) of each dig: parked cars keep clear
+CURB_CUT = 4.0          # corners are flush this far along the cross street: you can cut a jog tight without tripping on a curb
+
 # --- Traffic and crowds ---------------------------------------------------------
 CROSS_TRAFFIC_ROWS = {1: (8.5, 0.0), 4: (9.0, 3.0), 6: (8.0, 7.0), 8: (9.5, 1.5)}  # row: (speed, phase)
 CABLE_CAR_COL = 3
@@ -124,6 +136,21 @@ SEED = 4242
 # neighbours touch at intersections, so open blocks chain into free lines
 # from the summit to the bay.
 OPEN_KINDS = ["park", "plaza", "parking"]
+
+
+# --- Jogged grid (Conner 2026-11-19: "i can just hold forward and finish. that is
+# antithetical to the game. Lots of obstacles, lots of turning, lots of finding
+# good lines"). Like the offset intersections of real hill towns, every
+# downhill street steps sideways at each cross street, alternating left and
+# right, so riding straight across an intersection runs you into the
+# buildings on the far side. To keep going you turn onto the cross street and
+# turn down again, or cut a diagonal through an open block or an alley.
+# Only the House Jump stays straight: Sacra -> Pine Terrace -> the house is the
+# one long run-up, and you have to reach it first.
+JOG = 16.0                           # each street sits this far left or right of its column line
+STRAIGHT_BLOCKS = {(2, 2), (3, 2)}   # (block row, column) kept on the line: the House Jump run-up
+IX_HALF = JOG + HALF                 # half-length of an intersection along its cross street (covers both mouths)
+X_EDGE = 292.0                       # cross streets run out to here either side
 
 
 def is_open(r, c):
@@ -150,6 +177,21 @@ def col_x(c):
     return COLS[c][1]
 
 
+def block_off(r, c):
+    """Sideways jog of column c's street on block row r (row r down to row r + 1)."""
+    if (r, c) in STRAIGHT_BLOCKS:
+        return 0.0
+    return JOG if (r + c) % 2 == 0 else -JOG
+
+
+def bx(r, c):
+    """Centre x of column c's downhill street on block row r. Block rows run 0..8
+    (8 = Shore St down to the Bayfront); -1 is the drop-in above Crest Way."""
+    if r < 0:
+        return 0.0 if c == 2 else col_x(c)
+    return col_x(c) + block_off(r, c)
+
+
 def node(r, c):
     return (col_x(c), row_z(r), level(r, c))
 
@@ -158,15 +200,15 @@ def cross_y(r, x):
     """Height of cross street r at x (level within intersections, linear between)."""
     xs = [col_x(c) for c in range(len(COLS))]
     for c in range(len(xs)):
-        if abs(x - xs[c]) <= HALF:
+        if abs(x - xs[c]) <= IX_HALF:
             return level(r, c)
     if x < xs[0]:
         return level(r, 0)
     if x > xs[-1]:
         return level(r, len(xs) - 1)
     for c in range(len(xs) - 1):
-        a = xs[c] + HALF
-        b = xs[c + 1] - HALF
+        a = xs[c] + IX_HALF
+        b = xs[c + 1] - IX_HALF
         if a <= x <= b:
             t = (x - a) / (b - a)
             return level(r, c) + t * (level(r, c + 1) - level(r, c))
@@ -175,7 +217,7 @@ def cross_y(r, x):
 
 def block_profile(c, r):
     """Points [x, z, y] down column c from row r's downhill edge to the next row's uphill edge."""
-    x = col_x(c)
+    x = bx(r, c)
     z0 = row_z(r) - HALF
     y0 = level(r, c)
     if r + 1 < len(ROWS):
@@ -250,7 +292,7 @@ streets.append({"id": "drop_in", "points": [[0, 22, 9], [0, 14, 8.2], [0, -22.5,
 # Downhill streets, block by block.
 for c in range(len(COLS)):
     for r in range(len(ROWS)):
-        x = col_x(c)
+        x = bx(r, c)
         if c == 2 and r == TERRACE_ROW:
             # Lower Hillcrest: starts below the jump house, steep, then eases out.
             z_end = row_z(r + 1) + HALF
@@ -270,11 +312,11 @@ for c in range(len(COLS)):
 
 # Cross streets (level inside intersections), then the promenade.
 for r in range(len(ROWS)):
-    pts = [[-262.0, row_z(r), level(r, 0)]]
+    pts = [[-X_EDGE, row_z(r), level(r, 0)]]
     for c in range(len(COLS)):
-        pts.append([col_x(c) - HALF, row_z(r), level(r, c)])
-        pts.append([col_x(c) + HALF, row_z(r), level(r, c)])
-    pts.append([262.0, row_z(r), level(r, len(COLS) - 1)])
+        pts.append([col_x(c) - IX_HALF, row_z(r), level(r, c)])
+        pts.append([col_x(c) + IX_HALF, row_z(r), level(r, c)])
+    pts.append([X_EDGE, row_z(r), level(r, len(COLS) - 1)])
     streets.append({"id": ROWS[r][0].lower().replace(" ", "_"), "points": pts, "width": ROAD + 2 * SIDEWALK, "feather": 6.0})
 streets.append({"id": "bayfront", "points": [[-330, PROM_Z, PROM_Y], [330, PROM_Z, PROM_Y]], "width": PROM_W, "feather": 2.0})
 
@@ -325,19 +367,23 @@ for s in streets:
                 a, b = pts[i], pts[i + 1]
                 add_sidewalk((a[0] + side * SW_OFF, a[1]), (b[0] + side * SW_OFF, b[1]), a[2], b[2])
     elif is_cross:
+        r = [i for i, rr in enumerate(ROWS) if rr[0].lower().replace(" ", "_") == sid][0]
         for side in (-1, 1):
             z = pts[0][1] + side * SW_OFF
-            r = [i for i, rr in enumerate(ROWS) if rr[0].lower().replace(" ", "_") == sid][0]
+            brow = r if side < 0 else r - 1   # the block row this side of the street faces
+            if brow < 0:   # north side of Crest Way: one mouth, the drop-in
+                for xa, xb in ((-X_EDGE + 20, -HALF), (HALF, X_EDGE - 20)):
+                    add_sidewalk((xa, z), (xb, z), cross_y(r, xa), cross_y(r, xb))
+                continue
             for c in range(len(COLS) - 1):
-                brow = r if side < 0 else r - 1
-                if brow >= 0 and is_open(brow, c):
+                if is_open(brow, c):
                     continue
-                xa = col_x(c) + HALF
-                xb = col_x(c + 1) - HALF
-                add_sidewalk((xa, z), (xb, z), level(r, c), level(r, c + 1))
+                xa = bx(brow, c) + HALF + CURB_CUT
+                xb = bx(brow, c + 1) - HALF - CURB_CUT
+                add_sidewalk((xa, z), (xb, z), cross_y(r, xa), cross_y(r, xb))
 # Promenade: inland sidewalk only, open at every street mouth; the seaward
 # edge is the seawall rail.
-_edges = [-330.0] + [v for c in COLS for v in (c[1] - HALF, c[1] + HALF)] + [330.0]
+_edges = [-330.0] + [v for c in range(len(COLS)) for v in (bx(8, c) - HALF, bx(8, c) + HALF)] + [330.0]
 for k in range(0, len(_edges), 2):
     add_sidewalk((_edges[k], PROM_Z + PROM_W / 2 - 1.75), (_edges[k + 1], PROM_Z + PROM_W / 2 - 1.75), PROM_Y, PROM_Y)
 features += sidewalk_ramps
@@ -394,8 +440,8 @@ for r in range(len(ROWS)):
     z_top = row_z(r) - HALF
     z_bot = (row_z(r + 1) + HALF) if r + 1 < len(ROWS) else PROM_Z + PROM_W / 2
     for c in range(len(COLS) - 1):
-        xa = xs[c] + HALF
-        xb = xs[c + 1] - HALF
+        xa = bx(r, c) + HALF
+        xb = bx(r, c + 1) - HALF
         tall = (c <= 1 and r >= 6)
         if is_open(r, c):
             open_blocks.append((r, c, xa, xb, z_top, z_bot))
@@ -407,8 +453,8 @@ for r in range(len(ROWS)):
         lot_row(xa + DEPTH, xb - DEPTH, z_top, z_top, True, -1, DEPTH, tall)
         lot_row(xa + DEPTH, xb - DEPTH, z_bot, z_bot, True, +1, DEPTH, tall)
     # Outer edges of the grid.
-    lot_row(xs[0] - HALF, xs[0] - HALF, z_top, z_bot, False, -1, 40.0, r >= 6)
-    lot_row(xs[-1] + HALF, xs[-1] + HALF, z_top, z_bot, False, +1, 40.0, False)
+    lot_row(bx(r, 0) - HALF, bx(r, 0) - HALF, z_top, z_bot, False, -1, 40.0, r >= 6)
+    lot_row(bx(r, len(COLS) - 1) + HALF, bx(r, len(COLS) - 1) + HALF, z_top, z_bot, False, +1, 40.0, False)
 # North side of Crest Way, either side of the summit park.
 for xa, xb in ((-300.0, -40.0), (40.0, 300.0)):
     lot_row(xa, xb, row_z(0) + HALF, row_z(0) + HALF, True, +1, DEPTH)
@@ -455,10 +501,10 @@ for k, (r, c, xa, xb, z_top, z_bot) in enumerate(open_blocks):
         features.append({"type": "crowd", "id": "plaza_%d_%d" % (r, c), "a": [round(fx - 12, 1), round(fz + 9, 1)],
                          "b": [round(fx + 12, 1), round(fz + 9, 1)], "count": 6, "walkers": 3, "spread": 3.0, "seed": 400 + k})
         for b in range(4):
-            bx = rng.uniform(xa + 8, xb - 8)
+            bnx = rng.uniform(xa + 8, xb - 8)
             bz = rng.uniform(z_bot + 8, z_top - 8)
-            if not blocked((bx, bz), 3):
-                open_props.append({"p": [round(bx, 1), round(bz, 1)], "s": [2.2, 0.5, 0.7], "yaw": rng.choice([0, 90]), "lift": 0.0, "c": "#7a5c44"})
+            if not blocked((bnx, bz), 3):
+                open_props.append({"p": [round(bnx, 1), round(bz, 1)], "s": [2.2, 0.5, 0.7], "yaw": rng.choice([0, 90]), "lift": 0.0, "c": "#7a5c44"})
     else:  # parking lot: bays run downhill with wide aisles, so you flow down them
         for col_k in range(3):
             px = xa + w * (0.25 + 0.25 * col_k)
@@ -467,7 +513,55 @@ for k, (r, c, xa, xb, z_top, z_bot) in enumerate(open_blocks):
                 if rng.random() < 0.55 and not blocked((px, pz), 3.5):
                     car(px, pz, rng.choice([90, -90]))
                 pz -= 3.0
+# Obstacle fields: every open block is a slalom. Staggered rows of props
+# (hedges and boulders in parks, planters and benches on plazas, kerbed islands
+# and cars in parking lots) with gaps narrower than the props, offset row to
+# row, so no straight line crosses a block: you weave, or hop the low ones.
+for k, (r, c, xa, xb, z_top, z_bot) in enumerate(open_blocks):
+    kind = OPEN_KINDS[k % len(OPEN_KINDS)]
+    fr = random.Random(SEED * 7 + k)
+    zz = z_top - FIELD_EDGE
+    row_i = 0
+    while zz > z_bot + FIELD_EDGE:
+        x = xa + FIELD_EDGE + (FIELD_PITCH / 2 if row_i % 2 else 0.0) + fr.uniform(-1.5, 1.5)
+        while x < xb - FIELD_EDGE:
+            low = fr.random() < FIELD_LOW_SHARE
+            if kind == "park":
+                item = {"s": [FIELD_PROP_W, 0.55 if low else 1.4, 2.0], "c": "#7d7a70" if low else "#3f6b3a"}
+            elif kind == "plaza":
+                item = {"s": [FIELD_PROP_W, 0.5 if low else 0.95, 1.6], "c": "#7a5c44" if low else "#a8a196"}
+            else:
+                item = {"s": [FIELD_PROP_W, 0.25 if low else 0.9, 2.4], "c": "#b9b5ad" if low else rng.choice(CAR_COLORS)}
+            pz = zz + fr.uniform(-1.5, 1.5)
+            if not blocked((x, pz), FIELD_PROP_W / 2 + 2.0):
+                item.update({"p": [round(x, 1), round(pz, 1)], "yaw": fr.choice([0, 0, 15, -15]), "lift": 0.0})
+                open_props.append(item)
+            x += FIELD_PITCH
+        zz -= FIELD_ROW_GAP
+        row_i += 1
 features.append({"type": "solids", "id": "open_block_props", "style": "prop", "items": open_props})
+
+# Street works: one per closed block, a barricaded dig that takes most of the
+# road on one side (alternating) so even the streets make you steer.
+works = []
+for s_ in streets:
+    sid = s_["id"]
+    if not sid.split("_")[-1].isdigit() or sid.startswith(("lantern", "mint", "fog", "cannery", "rope", "tar")):
+        continue
+    names = [cc[0].split()[0].lower() for cc in COLS]
+    if sid.split("_")[0] not in names:
+        continue
+    wc = names.index(sid.split("_")[0])
+    wr = int(sid.split("_")[-1])
+    if (wr, wc) in STRAIGHT_BLOCKS:
+        continue
+    p0, p3 = s_["points"][0], s_["points"][-1]
+    side = 1 if (wr * 3 + wc) % 2 else -1
+    wz = p0[1] + (p3[1] - p0[1]) * rng.uniform(0.3, 0.5)
+    wx = p0[0] + side * WORKS_OFFSET
+    works.append({"p": [round(wx, 2), round(wz, 2)], "s": [WORKS_W, 1.05, WORKS_L], "c": "#d9822b", "lift": 0.0})
+    works_zones.append((wx, wz))
+features.append({"type": "solids", "id": "street_works", "style": "prop", "items": works})
 features.append({"type": "solids", "id": "houses", "style": "building", "items": houses})
 features.append({"type": "solids", "id": "downtown", "style": "building", "items": downtown})
 
@@ -476,7 +570,7 @@ features.append({"type": "kicker", "id": "terrace_driveway", "at": DRIVEWAY["at"
                  "length": DRIVEWAY["length"], "height": DRIVEWAY["height"], "width": DRIVEWAY["width"], "kind": "#b9b5ad"})
 
 # --- Hillcrest Steps ---------------------------------------------------------------
-x = col_x(2)
+x = bx(STEPS_ROW, 2)
 z = row_z(STEPS_ROW) - HALF
 y = level(STEPS_ROW, 2)
 z_end = row_z(STEPS_ROW + 1) + HALF
@@ -510,7 +604,7 @@ hedges = []
 for side in (-1, 1):
     zz = row_z(STEPS_ROW) - HALF - 1
     while zz > z_end + 2:
-        hedges.append({"p": [side * (STEP_WIDTH / 2 + 0.8), round(zz - 2, 2)], "s": [1.6, 1.3, 3.8], "c": "#3f6b3a"})
+        hedges.append({"p": [x + side * (STEP_WIDTH / 2 + 0.8), round(zz - 2, 2)], "s": [1.6, 1.3, 3.8], "c": "#3f6b3a"})
         zz -= 4.2
 features.append({"type": "solids", "id": "steps_hedges", "style": "prop", "items": hedges})
 
@@ -531,7 +625,7 @@ for s in streets:
         zz = p0[1] - 16.0   # no parking on the crown or at the crosswalk
         while zz > p3[1] + 6.0:
             px = p0[0] + side * PARK
-            if rng.random() < 0.62 and not blocked((px, zz), 3.0) and not (sid == "lower_hillcrest" and side == 1 and zz > -415):
+            if rng.random() < 0.62 and not blocked((px, zz), 3.0) and not any(abs(px - wx) < 9 and abs(zz - wz) < 17 for wx, wz in works_zones) and not (sid == "lower_hillcrest" and side == 1 and zz > -415):
                 car(px, zz, 0 if side > 0 else 180)
             zz -= 6.2
 for r in range(len(ROWS)):
@@ -540,8 +634,8 @@ for r in range(len(ROWS)):
             brow = r if side < 0 else r - 1
             if brow >= 0 and is_open(brow, c):
                 continue
-            xx = col_x(c) + HALF + 5.0
-            while xx < col_x(c + 1) - HALF - 5.0:
+            xx = col_x(c) + IX_HALF + 4.0   # never inside an intersection: the jog needs the whole street
+            while xx < col_x(c + 1) - IX_HALF - 4.0:
                 pz = row_z(r) + side * PARK
                 if rng.random() < 0.5 and not blocked((xx, pz), 3.0):
                     car(xx, pz, 90 if side > 0 else -90)
@@ -560,15 +654,13 @@ for s in streets:
             center_segs.append([a[0] - 0.2, a[1], b[0] - 0.2, b[1]])
             center_segs.append([a[0] + 0.2, a[1], b[0] + 0.2, b[1]])
 for r in range(len(ROWS)):
-    for c in range(len(COLS) - 1):
-        xa, xb = col_x(c) + HALF, col_x(c + 1) - HALF
-        z = row_z(r)
-        center_segs.append([xa, z - 0.2, xb, z - 0.2])
-        center_segs.append([xa, z + 0.2, xb, z + 0.2])
+    z = row_z(r)
+    center_segs.append([-X_EDGE, z - 0.2, X_EDGE, z - 0.2])
+    center_segs.append([-X_EDGE, z + 0.2, X_EDGE, z + 0.2])
     for c in range(len(COLS)):
-        x = col_x(c)
-        z = row_z(r)
-        for zc in (z + HALF - 1.6, z - HALF + 1.6):   # across the downhill street
+        for x, zc in ((bx(r - 1, c), z + HALF - 1.6), (bx(r, c), z - HALF + 1.6)):   # across each mouth
+            if r == 0 and zc > z and c != 2:
+                continue
             for k in range(-5, 6):
                 zebra.append([x + k * 1.1, zc + 1.3, x + k * 1.1, zc - 1.3])
 features.append({"type": "paint", "id": "centre_lines", "segs": center_segs, "width": 0.14, "c": "#e0b630"})
@@ -580,32 +672,38 @@ for s in streets:
             a, b = s["points"][i], s["points"][i + 1]
             for dx in (-0.75, 0.75):
                 rails.append([a[0] + dx, a[1], b[0] + dx, b[1]])
-for r in range(len(ROWS)):
+for r in range(1, len(ROWS)):   # the jog across each intersection
     for dx in (-0.75, 0.75):
-        rails.append([col_x(CABLE_CAR_COL) + dx, row_z(r) + HALF, col_x(CABLE_CAR_COL) + dx, row_z(r) - HALF])
+        rails.append([bx(r - 1, CABLE_CAR_COL) + dx, row_z(r) + HALF, bx(r, CABLE_CAR_COL) + dx, row_z(r) - HALF])
 features.append({"type": "paint", "id": "cable_tracks", "segs": rails, "width": 0.12, "c": "#55585c", "lift": 0.035})
 
 # --- Traffic -------------------------------------------------------------------------
 for r, (speed, phase) in CROSS_TRAFFIC_ROWS.items():
     z = row_z(r)
-    features.append({"type": "traffic", "id": "east_%d" % r, "a": [-262, z + 2.6], "b": [262, z + 2.6], "count": 2,
+    features.append({"type": "traffic", "id": "east_%d" % r, "a": [-X_EDGE, z + 2.6], "b": [X_EDGE, z + 2.6], "count": 2,
                      "speed": speed, "phase": phase * speed, "colors": [rng.choice(CAR_COLORS), rng.choice(CAR_COLORS)]})
-    features.append({"type": "traffic", "id": "west_%d" % r, "a": [262, z - 2.6], "b": [-262, z - 2.6], "count": 2,
+    features.append({"type": "traffic", "id": "west_%d" % r, "a": [X_EDGE, z - 2.6], "b": [-X_EDGE, z - 2.6], "count": 2,
                      "speed": speed * 0.9, "phase": (phase + 11) * speed, "colors": [rng.choice(CAR_COLORS), rng.choice(CAR_COLORS)]})
 features.append({"type": "traffic", "id": "bay_east", "a": [-330, PROM_Z + 3.5], "b": [330, PROM_Z + 3.5], "count": 3, "speed": 7.0, "phase": 20})
 features.append({"type": "traffic", "id": "bay_west", "a": [330, PROM_Z - 1.5], "b": [-330, PROM_Z - 1.5], "count": 3, "speed": 6.5, "phase": 90})
-features.append({"type": "traffic", "id": "cable_car", "style": "cable_car", "a": [col_x(CABLE_CAR_COL), PROM_Z + 4],
-                 "b": [col_x(CABLE_CAR_COL), row_z(0)], "count": 3, "speed": 4.2, "phase": 60})
+# The cable car climbs Juniper one block at a time (the line jogs with the street).
+for r in range(0, len(ROWS), 2):
+    x = bx(r, CABLE_CAR_COL)
+    z_lo = (row_z(r + 1) + HALF) if r + 1 < len(ROWS) else PROM_Z + PROM_W / 2
+    features.append({"type": "traffic", "id": "cable_car_%d" % r, "style": "cable_car", "a": [x - 0.0, z_lo + 6],
+                     "b": [x, row_z(r) - HALF - 6], "count": 1, "speed": 4.2, "phase": 13.0 * r})
 
 # --- Crowds ----------------------------------------------------------------------------
 crowd_id = 0
 for r in range(len(ROWS)):
     for c in range(len(COLS)):
-        x, z = col_x(c), row_z(r)
+        z = row_z(r)
+        x = bx(r, c)
         for sx in (-1, 1):
             for sz in (-1, 1):
                 if rng.random() < 0.7:
-                    cx, cz = x + sx * (HALF - 1.6), z + sz * (HALF - 1.6)
+                    xm = bx(r - 1, c) if sz > 0 else bx(r, c)   # corners of the mouth on that side
+                    cx, cz = xm + sx * (HALF - 1.6), z + sz * (HALF - 1.6)
                     features.append({"type": "crowd", "id": "corner_%d" % crowd_id, "a": [cx, cz], "b": [cx + sx * 1.5, cz + sz * 1.5],
                                      "count": rng.randint(1, 4), "spread": 0.7, "seed": crowd_id})
                     crowd_id += 1
@@ -630,7 +728,7 @@ for s in streets:
             crowd_id += 1
 # Bayfront tourists and the finish-pier crowd.
 # Gaps at every street mouth and at the pier so no exit is a wall of people.
-_gaps = [col_x(c) for c in range(len(COLS))] + [PIER_X]
+_gaps = [bx(8, c) for c in range(len(COLS))] + [PIER_X]
 _cuts = sorted([g - 11 for g in _gaps] + [g + 11 for g in _gaps])
 _spans = [(-325.0, _cuts[0])] + [(_cuts[i], _cuts[i + 1]) for i in range(1, len(_cuts) - 1, 2)] + [(_cuts[-1], 325.0)]
 for k, (xa, xb) in enumerate(_spans):
@@ -686,14 +784,54 @@ features += [
 ]
 
 # --- Dev autopilot routes ([x, z] or [x, z, cap km/h, jump hold s]) ------------------------
-routes["house"] = [[0, 25], [0, -30, 0], [0, -150], [0, -300, 0], [0, -340, 66], [0, -360, 66, 0.5], [0, -380, 0], [0, -420], [0, -480],
-                   [0, -560], [0, -598, 40], [0, -650], [0, -700, 0], [0, -800], [0, -920], [0, -1000], [0, -1110]]
-routes["runway"] = [[0, -575], [5.25, -590, 0], [5.25, -700], [0, -720], [0, -1000], [0, -1110]]
-routes["open"] = [[0, 25], [0, -40], [62, -95], [125, -150], [187, -205], [125, -260], [62, -315], [125, -370], [187, -425],
-                  [125, -480], [62, -535], [125, -590], [187, -645], [125, -700], [62, -755], [125, -810], [187, -865],
-                  [125, -920], [62, -960], [0, -1000, 0], [0, -1110]]
-routes["juniper"] = [[0, 25], [0, -30, 25], [20, -40], [100, -40], [125, -60, 0], [125, -300], [125, -600], [125, -900],
-                     [125, -980, 30], [60, -1000], [10, -1012, 0], [0, -1030], [0, -1110]]
+JOG_CAP = 24.0   # km/h the route bots slow to before an offset intersection
+
+
+def street_route(cols, house=False, steps_runway=True):
+    """Autopilot route down the jogged grid: cols[r] is the column taken on block
+    row r (0..8). Slows for every jog, steers round street works, takes the
+    steps runway on Hillcrest. house=True pops the driveway over the jump house."""
+    pts = [[0, 25], [0, 0]]
+    prev_x = 0.0
+    for r in range(len(ROWS)):
+        c = cols[r]
+        x = bx(r, c)
+        z = row_z(r)
+        if house and r == TERRACE_ROW:
+            pts += [[x, z + HALF + 25, 66], [x, -360, 66, 0.5], [x, -380, 0], [x, -420]]
+            prev_x = x
+            continue
+        steps = c == 2 and r == STEPS_ROW and steps_runway
+        if steps:   # aim for the smooth runway beside the stairs
+            x = x + STEP_WIDTH / 2 - STEP_RUNWAY / 2
+        cap_z = min(z + HALF + 30, pts[-1][1] - 2)   # brake early: arriving fast at a jog is a bail
+        pts.append([prev_x, cap_z, JOG_CAP])
+        if cap_z - 2 > z + HALF + 6:
+            pts.append([prev_x, z + HALF + 6])
+        if abs(x - prev_x) > 2 * IX_HALF:   # changing column: ride the cross street
+            pts += [[prev_x + math.copysign(10, x - prev_x), z - 1.5], [x - math.copysign(14, x - prev_x), z - 2.5]]
+        elif steps:   # square up on the cross street: the runway is narrow
+            pts += [[prev_x + 0.6 * (x - prev_x), z + 1.5], [x, z - 3]]
+        elif abs(x - prev_x) > 1:
+            dx = x - prev_x
+            pts += [[prev_x + 0.35 * dx, z + 1.5], [x - 0.1 * dx, z - HALF + 1]]
+        if steps:
+            pts += [[x, z - HALF - 8, 40], [x, row_z(r + 1) + HALF + 2, 0]]
+        else:
+            pts.append([x, z - HALF - 8, 0])
+        for wx, wz in works_zones:
+            if abs(wx - x) < 6 and (row_z(r + 1) if r + 1 < len(ROWS) else PROM_Z) < wz < z:
+                side = 1 if wx > x else -1
+                pts += [[x - side * 3.4, wz + 12], [x - side * 3.4, wz - 7]]
+        prev_x = x
+    pts += [[prev_x, min(PROM_Z + PROM_W / 2 + 30, pts[-1][1] - 2), JOG_CAP], [(prev_x + PIER_X) / 2, PROM_Z], [PIER_X, SEAWALL_Z - 3, 0], [PIER_X, -1110]]
+    return pts
+
+
+routes["house"] = street_route([2, 2, 2, 2, 2, 2, 2, 2, 2], house=True)
+routes["hillcrest"] = street_route([2, 2, 2, 3, 2, 2, 2, 2, 2])
+routes["juniper"] = street_route([3, 3, 3, 3, 3, 3, 3, 3, 3])
+routes["quarry"] = street_route([0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 level_grid = {
     "xs": [-330, -250, -125, 0, 125, 250, 330],
@@ -731,10 +869,10 @@ data = {
         "landforms": landforms,
     },
     "gates": [
-        {"name": "Pine Terrace", "z": row_z(3), "pads": xs, "pad_offset": 0, "face_down": True,
-         "posts": [x + s * (HALF + 0.6) for x in xs for s in (-1, 1)]},
-        {"name": "Wharf Hill", "z": row_z(6), "pads": xs, "pad_offset": 0, "face_down": True,
-         "posts": [x + s * (HALF + 0.6) for x in xs for s in (-1, 1)]},
+        {"name": "Pine Terrace", "z": row_z(3), "pads": [bx(3, c) for c in range(len(COLS))], "pad_offset": 0, "face_down": True,
+         "posts": [bx(3, c) + s * (HALF + 0.6) for c in range(len(COLS)) for s in (-1, 1)]},
+        {"name": "Wharf Hill", "z": row_z(6), "pads": [bx(6, c) for c in range(len(COLS))], "pad_offset": 0, "face_down": True,
+         "posts": [bx(6, c) + s * (HALF + 0.6) for c in range(len(COLS)) for s in (-1, 1)]},
         {"name": "Finish", "z": FINISH_Z, "kind": "finish", "arch_x": PIER_X, "y": PROM_Y + (PIER_END_Z + 6 - FINISH_Z) / 6.0,
          "line_width": PIER_W, "arch_width": PIER_W + 1.5},
     ],

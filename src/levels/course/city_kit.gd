@@ -26,6 +26,20 @@ const PED_SKIN: Array[String] = ["#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#f
 
 
 ## Builds one city feature from its data entry.
+## Group holding every crowd, walker and traffic body this kit builds.
+const PEOPLE_AND_TRAFFIC := &"city_people_and_traffic"
+
+
+## Dev and test use only: removes every crowd, walker and vehicle, so a bot
+## that cannot dodge can still measure whether the streets themselves are
+## passable. Players always ride with them.
+func remove_people_and_traffic() -> void:
+	_movers.clear()
+	for n: Node in get_tree().get_nodes_in_group(PEOPLE_AND_TRAFFIC):
+		if is_ancestor_of(n):
+			n.queue_free()
+
+
 func place(f: Dictionary) -> void:
 	match String(f["type"]):
 		"solids":
@@ -142,6 +156,7 @@ func crowd(f: Dictionary) -> void:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var body := StaticBody3D.new()
 	body.name = String(f.get("id", "Crowd"))
+	body.add_to_group(PEOPLE_AND_TRAFFIC)
 	add_child(body)
 	var area := _hazard_area(body, "Hit a pedestrian", min_speed)
 	for i: int in count:
@@ -171,6 +186,7 @@ func crowd(f: Dictionary) -> void:
 	for i: int in walkers:
 		var w := AnimatableBody3D.new()
 		w.name = "Walker%d" % i
+		w.add_to_group(PEOPLE_AND_TRAFFIC)
 		add_child(w)
 		var wst := SurfaceTool.new()
 		wst.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -219,6 +235,7 @@ func traffic(f: Dictionary) -> void:
 		var body := AnimatableBody3D.new()
 		body.name = "%s%d" % [String(f.get("id", "Traffic")), i]
 		body.sync_to_physics = false
+		body.add_to_group(PEOPLE_AND_TRAFFIC)
 		add_child(body)
 		var st := SurfaceTool.new()
 		st.begin(Mesh.PRIMITIVE_TRIANGLES)
