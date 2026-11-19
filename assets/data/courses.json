@@ -8,10 +8,10 @@
    "blurb": "A steep bay city. Bomb the hill through crowded streets, find your own line, and finish with a jump off the pier into the bay."
   },
   {
-   "id": "copperline_mountain",
+   "id": "copperline_mountain_v2",
    "name": "Copperline Mountain",
    "path": "res://assets/data/course_copperline_mountain.json",
-   "blurb": "A huge paved mountain fan. Lines braid, split and rejoin all the way down."
+   "blurb": "A huge open concrete valley that snakes left and right as it drops. Ride anywhere and find your own line."
   },
   {
    "id": "test_slope",
