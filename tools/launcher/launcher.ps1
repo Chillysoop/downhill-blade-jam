@@ -48,7 +48,11 @@ try {
         Start-Sleep -Milliseconds 300
         $staging = Join-Path $Root 'staging'
         if (Test-Path $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
-        Expand-Archive -LiteralPath $zip -DestinationPath $staging -Force
+        # The 2-argument .NET call works on every Windows PowerShell and pwsh.
+        # Expand-Archive can load pwsh's newer Archive module inside Windows
+        # PowerShell, which calls a 3-argument overload that doesn't exist there.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $staging)
         if (-not (Test-Path (Join-Path $staging 'DownhillBladeJam.exe'))) { throw 'Downloaded build is missing the game.' }
         if (Test-Path $GameDir) { Remove-Item -LiteralPath $GameDir -Recurse -Force }
         Move-Item -LiteralPath $staging -Destination $GameDir
