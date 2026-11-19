@@ -198,3 +198,32 @@ static func street_height(p: Vector2, a: Vector3, b: Vector3) -> float:
 	var ab: Vector2 = b2 - a2
 	var t: float = clampf((p - a2).dot(ab) / maxf(ab.length_squared(), 0.0001), 0.0, 1.0)
 	return lerpf(a.z, b.z, t)
+
+
+## Smooth landform cross-section (open-form terrain): full [param height] for
+## [param n] (normalised distance, 0 = centre, 1 = edge) inside
+## [param plateau], easing to 0 at the edge with a cosine, so the ground
+## never kinks. Hills, bowls (negative height), ridges and gullies use it.
+static func landform_profile(n: float, height: float, plateau: float) -> float:
+	var a: float = absf(n)
+	if a >= 1.0:
+		return 0.0
+	var p: float = clampf(plateau, 0.0, 0.95)
+	if a <= p:
+		return height
+	var u: float = (a - p) / (1.0 - p)
+	return height * (0.5 + 0.5 * cos(PI * u))
+
+
+## Valley-edge bank: how far the ground rises [param d] metres past the fan
+## edge. A smooth concrete bank [param bank_w] wide rises [param bank_h]
+## (flat at the edge, steepest at the top), then the wall continues at slope
+## [param wall_tan] up to [param cap] in total.
+static func bank_rise(d: float, bank_w: float, bank_h: float, wall_tan: float, cap: float) -> float:
+	if d <= 0.0:
+		return 0.0
+	if bank_w <= 0.0:
+		return minf(d * wall_tan, cap)
+	if d <= bank_w:
+		return minf(bank_h * (1.0 - cos(0.5 * PI * d / bank_w)), cap)
+	return minf(bank_h + (d - bank_w) * wall_tan, cap)

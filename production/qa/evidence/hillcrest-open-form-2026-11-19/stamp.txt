@@ -1,0 +1,2 @@
+Reviewed-Content-Hash: tools/levels/gen_hillcrest.py d12e8aa3114ce3460099148c6d00693cee7a9ff3
+Reviewed-Content-Hash: assets/data/course_hillcrest_drop.json 7421607099d0449ec6506d75cd2b87f5ed95385b

@@ -46,6 +46,25 @@ LEVELS = [
     [-105, -109, -109, -104, -100],  # Shore
 ]
 
+# The whole hill ebbs left and right (Conner, 2026-11-19: "the entire map can
+# ebb left and right, so you can't just bomb straight down"): a slow sideways
+# lean that swaps sides down the hill, so the fall line wanders across the grid
+# and the fastest street changes from block to block. Every street still drops
+# at least MIN_BLOCK_DROP per block (no uphill blocks, no dead ends).
+EBB_AMP = 7.0            # metres of extra height at the grid edge (x = ±250)
+EBB_WAVELENGTH = 520.0   # metres down the hill for one full left-right-left swing
+EBB_PHASE = 0.6          # radians
+MIN_BLOCK_DROP = 4.0
+_raw_levels = [row[:] for row in LEVELS]
+for _r in range(len(LEVELS)):
+    _z = -40.0 - 110.0 * _r
+    for _c, _x in enumerate([-250.0, -125.0, 0.0, 125.0, 250.0]):
+        LEVELS[_r][_c] = round(_raw_levels[_r][_c] + EBB_AMP * math.sin(2 * math.pi * -_z / EBB_WAVELENGTH + EBB_PHASE) * _x / 250.0, 1)
+for _c in range(5):
+    for _r in range(1, len(LEVELS)):
+        LEVELS[_r][_c] = min(LEVELS[_r][_c], LEVELS[_r - 1][_c] - MIN_BLOCK_DROP)
+    LEVELS[-1][_c] = max(LEVELS[-1][_c], -112.0 + 3.0)
+
 # Crown lips at the downhill exit of an intersection: (lip height, lip length).
 LIP = (0.35, 5.0)
 BIG_LIP = (0.75, 6.0)
@@ -97,6 +116,19 @@ FINISH_Z = -1102.5
 CROSS_TRAFFIC_ROWS = {1: (8.5, 0.0), 4: (9.0, 3.0), 6: (8.0, 7.0), 8: (9.5, 1.5)}  # row: (speed, phase)
 CABLE_CAR_COL = 3
 SEED = 4242
+
+# --- Open blocks (open-form pass, Conner 2026-11-19: "way more fluid and open
+# form", big open maps but bounded and downhill). A checkerboard of blocks has
+# no buildings: the whole block is a paved, sloping hillside you can carve
+# across from any street, dressed as a park, plaza or parking lot. Diagonal
+# neighbours touch at intersections, so open blocks chain into free lines
+# from the summit to the bay.
+OPEN_KINDS = ["park", "plaza", "parking"]
+
+
+def is_open(r, c):
+    """Block between rows r..r+1 and columns c..c+1 (r may be 8: Shore to Bayfront)."""
+    return (r + c) % 2 == 0
 
 PALETTE = ["#e8d9b5", "#c9d6df", "#f2c6b4", "#b5d3b0", "#f3e3a1", "#d8c3e0", "#a9c4d8",
            "#efefe6", "#d9a38f", "#9fb8a7", "#e6b8c2", "#c8b79a"]
@@ -282,17 +314,26 @@ for s in streets:
     is_cross = any(sid == r[0].lower().replace(" ", "_") for r in ROWS)
     is_block = sid.split("_")[0] in [c[0].split()[0].lower() for c in COLS] and sid.split("_")[-1].isdigit()
     if is_block or sid in ("lower_hillcrest", "drop_in"):
+        names = [cc[0].split()[0].lower() for cc in COLS]
+        col = names.index(sid.split("_")[0]) if is_block else 2
+        brow = int(sid.split("_")[-1]) if is_block else (TERRACE_ROW if sid == "lower_hillcrest" else -1)
         for side in (-1, 1):
+            gap = col - 1 if side < 0 else col
+            if brow >= 0 and 0 <= gap < len(COLS) - 1 and is_open(brow, gap):
+                continue   # flush edge: roll straight off the street into the open block
             for i in range(len(pts) - 1):
                 a, b = pts[i], pts[i + 1]
                 add_sidewalk((a[0] + side * SW_OFF, a[1]), (b[0] + side * SW_OFF, b[1]), a[2], b[2])
     elif is_cross:
         for side in (-1, 1):
             z = pts[0][1] + side * SW_OFF
+            r = [i for i, rr in enumerate(ROWS) if rr[0].lower().replace(" ", "_") == sid][0]
             for c in range(len(COLS) - 1):
+                brow = r if side < 0 else r - 1
+                if brow >= 0 and is_open(brow, c):
+                    continue
                 xa = col_x(c) + HALF
                 xb = col_x(c + 1) - HALF
-                r = [i for i, rr in enumerate(ROWS) if rr[0].lower().replace(" ", "_") == sid][0]
                 add_sidewalk((xa, z), (xb, z), level(r, c), level(r, c + 1))
 # Promenade: inland sidewalk only, open at every street mouth; the seaward
 # edge is the seawall rail.
@@ -336,7 +377,17 @@ def lot_row(x0, x1, z0, z1, along_x, depth_dir, depth=16.0, tall=False):
         s += w
 
 
+cars = []
+
+
+def car(px, pz, yaw):
+    col = rng.choice(CAR_COLORS)
+    cars.append({"p": [round(px, 2), round(pz, 2)], "s": [1.85, 0.8, 4.4], "yaw": yaw, "lift": 0.18, "c": col})
+    cars.append({"p": [round(px, 2), round(pz, 2)], "s": [1.65, 0.62, 2.3], "yaw": yaw, "lift": 0.95, "c": col})
+
+
 DEPTH = 16.0
+open_blocks = []
 xs = [col_x(c) for c in range(len(COLS))]
 row_edges = [row_z(r) for r in range(len(ROWS))] + [PROM_Z]
 for r in range(len(ROWS)):
@@ -346,6 +397,9 @@ for r in range(len(ROWS)):
         xa = xs[c] + HALF
         xb = xs[c + 1] - HALF
         tall = (c <= 1 and r >= 6)
+        if is_open(r, c):
+            open_blocks.append((r, c, xa, xb, z_top, z_bot))
+            continue
         # Frontages on the two downhill streets (full block length).
         lot_row(xa, xa, z_top, z_bot, False, +1, DEPTH, tall)
         lot_row(xb, xb, z_top, z_bot, False, -1, DEPTH, tall)
@@ -363,6 +417,57 @@ lot_row(-HALF, -HALF, 14.0, row_z(0) + HALF + DEPTH, False, -1, DEPTH)
 lot_row(HALF, HALF, 14.0, row_z(0) + HALF + DEPTH, False, +1, DEPTH)
 
 houses.append(dict(HOUSE))   # the jump house, roof below the terrace
+
+# Dress the open blocks. Their ground is the smooth lot plane between the four
+# intersections, painted concrete; what sits on it is sparse so lines stay free.
+bands = []
+landforms = []   # park mounds and plaza bowls (open-form stamps, docs/course-data-schema.md)
+open_props = []
+for k, (r, c, xa, xb, z_top, z_bot) in enumerate(open_blocks):
+    kind = OPEN_KINDS[k % len(OPEN_KINDS)]
+    cx = (xa + xb) / 2
+    w = xb - xa
+    bands.append({"id": "open_%d_%d" % (r, c), "points": [[cx, z_top + 4], [cx, (z_top + z_bot) / 2], [cx, z_bot - 4]],
+                  "width": w + 8, "surface": "concrete", "paint_frac": 1.0, "keep": ["rock"]})
+    L = z_top - z_bot
+    # Something to carve or pump in every open block, well clear of the streets.
+    if kind == "park":
+        for m in range(2):
+            mx = xa + w * (0.3 + 0.4 * m) + rng.uniform(-6, 6)
+            mz = z_top - L * (0.3 + 0.4 * ((m + k) % 2)) + rng.uniform(-6, 6)
+            landforms.append({"type": "hill", "x": round(mx, 1), "z": round(mz, 1), "rx": round(rng.uniform(11, 16), 1),
+                              "rz": round(rng.uniform(13, 20), 1), "yaw": rng.randint(0, 180), "height": round(rng.uniform(1.6, 3.0), 1)})
+    elif kind == "plaza":
+        landforms.append({"type": "hill", "x": round(cx, 1), "z": round(z_top - L * 0.7, 1), "rx": 16.0, "rz": 14.0,
+                          "height": -2.4, "plateau": 0.35})
+    if kind == "park":
+        for t in range(rng.randint(3, 5)):
+            px = rng.uniform(xa + 12, xb - 12)
+            pz = rng.uniform(z_bot + 12, z_top - 12)
+            if blocked((px, pz), 8):
+                continue
+            features.append({"type": "trees", "id": "park_%d_%d_%d" % (r, c, t), "at": [round(px, 1), round(pz, 1)],
+                             "radius": rng.uniform(4, 9), "count": rng.randint(2, 5), "seed": 300 + k * 10 + t})
+    elif kind == "plaza":
+        fx, fz = cx + rng.uniform(-15, 15), (z_top + z_bot) / 2 + rng.uniform(-12, 12)
+        features.append({"type": "cylinder", "id": "fountain_%d_%d" % (r, c), "at": [round(fx, 1), round(fz, 1)],
+                         "radius": 4.5, "height": 1.1, "kind": "#b9b5ad", "collide": True})
+        features.append({"type": "crowd", "id": "plaza_%d_%d" % (r, c), "a": [round(fx - 12, 1), round(fz + 9, 1)],
+                         "b": [round(fx + 12, 1), round(fz + 9, 1)], "count": 6, "walkers": 3, "spread": 3.0, "seed": 400 + k})
+        for b in range(4):
+            bx = rng.uniform(xa + 8, xb - 8)
+            bz = rng.uniform(z_bot + 8, z_top - 8)
+            if not blocked((bx, bz), 3):
+                open_props.append({"p": [round(bx, 1), round(bz, 1)], "s": [2.2, 0.5, 0.7], "yaw": rng.choice([0, 90]), "lift": 0.0, "c": "#7a5c44"})
+    else:  # parking lot: bays run downhill with wide aisles, so you flow down them
+        for col_k in range(3):
+            px = xa + w * (0.25 + 0.25 * col_k)
+            pz = z_top - 10
+            while pz > z_bot + 10:
+                if rng.random() < 0.55 and not blocked((px, pz), 3.5):
+                    car(px, pz, rng.choice([90, -90]))
+                pz -= 3.0
+features.append({"type": "solids", "id": "open_block_props", "style": "prop", "items": open_props})
 features.append({"type": "solids", "id": "houses", "style": "building", "items": houses})
 features.append({"type": "solids", "id": "downtown", "style": "building", "items": downtown})
 
@@ -410,22 +515,19 @@ for side in (-1, 1):
 features.append({"type": "solids", "id": "steps_hedges", "style": "prop", "items": hedges})
 
 # --- Parked cars -------------------------------------------------------------------
-cars = []
-
-
-def car(px, pz, yaw):
-    col = rng.choice(CAR_COLORS)
-    cars.append({"p": [round(px, 2), round(pz, 2)], "s": [1.85, 0.8, 4.4], "yaw": yaw, "lift": 0.18, "c": col})
-    cars.append({"p": [round(px, 2), round(pz, 2)], "s": [1.65, 0.62, 2.3], "yaw": yaw, "lift": 0.95, "c": col})
-
-
 PARK = ROAD / 2 - 1.15
 for s in streets:
     sid = s["id"]
     if not (sid.split("_")[-1].isdigit() or sid == "lower_hillcrest"):
         continue
     p0, p3 = s["points"][0], s["points"][-1]
+    names = [cc[0].split()[0].lower() for cc in COLS]
+    pcol = names.index(sid.split("_")[0]) if sid != "lower_hillcrest" else 2
+    prow = int(sid.split("_")[-1]) if sid != "lower_hillcrest" else TERRACE_ROW
     for side in (-1, 1):
+        gap = pcol - 1 if side < 0 else pcol
+        if 0 <= gap < len(COLS) - 1 and is_open(prow, gap):
+            continue   # nothing parked along an open block's edge
         zz = p0[1] - 16.0   # no parking on the crown or at the crosswalk
         while zz > p3[1] + 6.0:
             px = p0[0] + side * PARK
@@ -435,6 +537,9 @@ for s in streets:
 for r in range(len(ROWS)):
     for c in range(len(COLS) - 1):
         for side in (-1, 1):
+            brow = r if side < 0 else r - 1
+            if brow >= 0 and is_open(brow, c):
+                continue
             xx = col_x(c) + HALF + 5.0
             while xx < col_x(c + 1) - HALF - 5.0:
                 pz = row_z(r) + side * PARK
@@ -584,6 +689,9 @@ features += [
 routes["house"] = [[0, 25], [0, -30, 0], [0, -150], [0, -300, 0], [0, -340, 66], [0, -360, 66, 0.5], [0, -380, 0], [0, -420], [0, -480],
                    [0, -560], [0, -598, 40], [0, -650], [0, -700, 0], [0, -800], [0, -920], [0, -1000], [0, -1110]]
 routes["runway"] = [[0, -575], [5.25, -590, 0], [5.25, -700], [0, -720], [0, -1000], [0, -1110]]
+routes["open"] = [[0, 25], [0, -40], [62, -95], [125, -150], [187, -205], [125, -260], [62, -315], [125, -370], [187, -425],
+                  [125, -480], [62, -535], [125, -590], [187, -645], [125, -700], [62, -755], [125, -810], [187, -865],
+                  [125, -920], [62, -960], [0, -1000, 0], [0, -1110]]
 routes["juniper"] = [[0, 25], [0, -30, 25], [20, -40], [100, -40], [125, -60, 0], [125, -300], [125, -600], [125, -900],
                      [125, -980, 30], [60, -1000], [10, -1012, 0], [0, -1030], [0, -1110]]
 
@@ -619,6 +727,8 @@ data = {
         "rock_slope_deg": 52,
         "level_grid": level_grid,
         "streets": streets,
+        "bands": bands,
+        "landforms": landforms,
     },
     "gates": [
         {"name": "Pine Terrace", "z": row_z(3), "pads": xs, "pad_offset": 0, "face_down": True,
