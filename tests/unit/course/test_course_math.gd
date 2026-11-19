@@ -15,6 +15,8 @@ func _init() -> void:
 	test_rough_drag_floor()
 	test_grid_bilinear_corners_and_middle()
 	test_street_height_along_and_across()
+	test_landform_profile_flat_top_smooth_edge_zero_outside()
+	test_bank_rise_starts_flat_then_walls_and_caps()
 	print("CourseMath tests: %s" % ("PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
@@ -100,3 +102,24 @@ func test_street_height_along_and_across() -> void:
 	check(is_equal_approx(CourseMath.street_height(Vector2(0.0, -50.0), a, b), -60.0), "street halfway")
 	check(is_equal_approx(CourseMath.street_height(Vector2(6.0, -50.0), a, b), -60.0), "street level across")
 	check(is_equal_approx(CourseMath.street_height(Vector2(0.0, 20.0), a, b), -50.0), "street clamps past its start")
+
+
+func test_landform_profile_flat_top_smooth_edge_zero_outside() -> void:
+	# Open-form hills and gullies (design/levels/copperline-mountain.md §5).
+	check(is_equal_approx(CourseMath.landform_profile(0.0, 6.0, 0.0), 6.0), "landform full height at centre")
+	check(is_equal_approx(CourseMath.landform_profile(0.3, 6.0, 0.4), 6.0), "landform flat inside plateau")
+	check(is_equal_approx(CourseMath.landform_profile(0.7, 6.0, 0.4), 3.0), "landform half height mid-flank")
+	check(CourseMath.landform_profile(1.0, 6.0, 0.0) == 0.0, "landform zero at edge")
+	check(CourseMath.landform_profile(1.5, -4.0, 0.0) == 0.0, "landform zero outside")
+	check(is_equal_approx(CourseMath.landform_profile(-0.0, -4.0, 0.0), -4.0), "bowl depth at centre")
+	var near_edge: float = CourseMath.landform_profile(0.99, 6.0, 0.0)
+	check(near_edge > 0.0 and near_edge < 0.01, "landform eases into the ground (got %.4f)" % near_edge)
+
+
+func test_bank_rise_starts_flat_then_walls_and_caps() -> void:
+	check(CourseMath.bank_rise(0.0, 20.0, 8.0, 0.8, 40.0) == 0.0, "bank zero at fan edge")
+	check(CourseMath.bank_rise(1.0, 20.0, 8.0, 0.8, 40.0) < 0.05, "bank starts flat")
+	check(is_equal_approx(CourseMath.bank_rise(20.0, 20.0, 8.0, 0.8, 40.0), 8.0), "bank height at its top")
+	check(is_equal_approx(CourseMath.bank_rise(30.0, 20.0, 8.0, 0.8, 40.0), 16.0), "wall continues above the bank")
+	check(is_equal_approx(CourseMath.bank_rise(500.0, 20.0, 8.0, 0.8, 40.0), 40.0), "wall caps")
+	check(is_equal_approx(CourseMath.bank_rise(10.0, 0.0, 0.0, 0.8, 40.0), 8.0), "no bank = plain wall")

@@ -198,6 +198,12 @@ func _build_terrain_nodes() -> void:
 		mat.set_shader_parameter(key, Color.html(v) if v is String else v)
 	var nx: int = terrain.nx
 	var nz: int = terrain.nz
+	# Open-form courses blur the surface weights over neighbouring vertices
+	# so rough patches have soft, rounded edges instead of cell steps.
+	var soft: bool = bool(_data["terrain"].get("soft_edges", false))
+	var soft_cols := PackedColorArray()
+	if soft:
+		soft_cols = _soft_weights(weights, nx, nz)
 	lowest_y = INF
 	for h: float in terrain.heights:
 		lowest_y = minf(lowest_y, h)
@@ -222,7 +228,7 @@ func _build_terrain_nodes() -> void:
 					var hd: float = terrain.heights[mini(iz + 1, nz - 1) * nx + ix]
 					# z decreases with iz: d/dz = (hu - hd) / (2 cell).
 					normals.append(Vector3(hl - hr, 2.0 * terrain.cell, hd - hu).normalized())
-					cols.append(weights[terrain.surfaces[i]])
+					cols.append(soft_cols[i] if soft else weights[terrain.surfaces[i]])
 			for iz: int in range(0, ez - cz):
 				for ix: int in range(0, ex - cx):
 					var a: int = iz * w + ix
@@ -290,6 +296,27 @@ func _build_water(w: Dictionary) -> void:
 	area.body_entered.connect(func(b: Node3D) -> void:
 		if b == _skater:
 			splashed.emit())
+
+
+## Surface weights per grid vertex, blurred with a 1-2-1 kernel each way.
+func _soft_weights(weights: Dictionary, nx: int, nz: int) -> PackedColorArray:
+	var raw := PackedColorArray()
+	raw.resize(nx * nz)
+	for i: int in nx * nz:
+		raw[i] = weights[terrain.surfaces[i]]
+	var tmp := PackedColorArray()
+	tmp.resize(nx * nz)
+	for iz: int in nz:
+		var row: int = iz * nx
+		for ix: int in nx:
+			tmp[row + ix] = (raw[row + maxi(ix - 1, 0)] + raw[row + ix] * 2.0 + raw[row + mini(ix + 1, nx - 1)]) * 0.25
+	for iz: int in nz:
+		var up: int = maxi(iz - 1, 0) * nx
+		var row: int = iz * nx
+		var dn: int = mini(iz + 1, nz - 1) * nx
+		for ix: int in nx:
+			raw[row + ix] = (tmp[up + ix] + tmp[row + ix] * 2.0 + tmp[dn + ix]) * 0.25
+	return raw
 
 
 ## Pale concrete texture with darker expansion joints; multiplies the ground
