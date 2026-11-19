@@ -74,6 +74,11 @@ var _turn_rate: float = 0.0
 var _stomp: float = 0.0
 var _slide_vis: float = 0.0
 var _wobble_t: float = 0.0
+var _air_spin: float = 0.0
+var _takeoff_spin: float = 0.0
+var _last_steer: float = 0.0
+var _curve_load: float = 0.0
+var _prev_n: Vector3 = Vector3.UP
 
 var _visual: Node3D
 var _body_pivot: Node3D
@@ -140,6 +145,7 @@ func get_speed() -> float:
 
 func _physics_process(dt: float) -> void:
 	var inp: Dictionary = _read_input()
+	_last_steer = float(inp["steer"])
 	if waiting_for_start:
 		var any_input: bool = absf(float(inp["steer"])) > 0.1 or float(inp["forward"]) > 0.1 \
 			or float(inp["brake"]) > 0.1 or bool(inp["jump"])
@@ -212,6 +218,11 @@ func _pop(n: Vector3, charge: float) -> void:
 	# steep slopes still feel like they go up.
 	var pop_dir: Vector3 = (n + Vector3.UP).normalized()
 	velocity += pop_dir * SkateMath.pop_speed(tuning, charge)
+	# Spin comes from the ground: the carve you were in plus a wind-up from
+	# steering on the pop. (A late pop in the air keeps the spin you have.)
+	var base_spin: float = _turn_rate if state == State.GROUNDED else _air_spin
+	_takeoff_spin = SkateMath.air_takeoff_spin(tuning, base_spin, _last_steer, charge)
+	_air_spin = _takeoff_spin
 	state = State.AIR
 	air_time = 0.0
 	_since_ground = 1.0
@@ -232,6 +243,7 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var brake_in: float = inp["brake"]
 	var braking: bool = brake_in > 0.05
 	tucking = fwd_in > 0.1 and not braking and not SkateMath.prefer_stride(t, speed, tucking)
+	var prev_tuck: float = tuck_amount
 	tuck_amount = SkateMath.step_tuck(t, tuck_amount, tucking, dt)
 	striding = fwd_in > 0.1 and not tucking and not braking and tuck_amount < 0.3
 	# Hard T-stop above hard_brake_speed; keep sliding down to half of it so it
@@ -261,6 +273,15 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	slip_speed = absf(v_l)
 	grip_usage = SkateMath.grip_usage(t, speed, _turn_rate, v_l)
 	v_f = SkateMath.apply_carve_scrub(t, v_f, speed, _turn_rate, dt)
+
+	# Pumping: how hard the terrain's curve presses you down (dips, banks) or
+	# unweights you (crests); standing up or tucking against it moves speed.
+	var travel: Vector3 = velocity.normalized() if speed > 0.5 else heading
+	var raw_load: float = SkateMath.ground_load(t, _prev_n, n, travel, speed, dt) - t.gravity * n.dot(Vector3.UP)
+	_curve_load = lerpf(_curve_load, raw_load, 1.0 - exp(-dt / maxf(t.pump_load_smoothing, 0.001)))
+	_prev_n = n
+	var pumped: float = SkateMath.pump_speed(t, absf(v_f), tuck_amount - prev_tuck, _curve_load)
+	v_f = pumped * (1.0 if v_f >= 0.0 else -1.0)
 
 	if striding:
 		v_f += SkateMath.stride_accel(t, maxf(v_f, 0.0), _stride_phase) * fwd_in * dt
@@ -293,16 +314,14 @@ func _air_step(dt: float, inp: Dictionary) -> void:
 	var sp: float = velocity.length()
 	if sp > 0.01:
 		velocity -= velocity / sp * minf(t.air_drag * sp * sp * dt, sp)
+	_air_spin = SkateMath.step_air_spin(t, _air_spin, _takeoff_spin, float(inp["steer"]), dt)
 	var flat: Vector3 = Vector3(heading.x, 0.0, heading.z)
 	if flat.length() < 0.01:
 		flat = Vector3(velocity.x, 0.0, velocity.z)
 	if flat.length() > 0.01:
-		heading = flat.normalized().rotated(Vector3.UP, -float(inp["steer"]) * t.air_spin_rate * dt)
+		heading = flat.normalized().rotated(Vector3.UP, -_air_spin * dt)
 
 
-## move_and_slide() strips the downhill (vertical) part of velocity while on
-## the floor, which would bleed speed every frame. Put it back by carrying the
-## pre-move velocity along the new floor, unless we hit a wall this step.
 ## Normal of the ground under the skater. A ray straight down finds the face
 ## the wheels are on; the collider's own floor normal can be a box corner or a
 ## stair edge, which would tilt the skater's idea of the slope.
@@ -317,6 +336,9 @@ func _surface_normal() -> Vector3:
 	return get_floor_normal()
 
 
+## move_and_slide() strips the downhill (vertical) part of velocity while on
+## the floor, which would bleed speed every frame. Put it back by carrying the
+## pre-move velocity along the new floor, unless we hit a wall this step.
 func _restore_slope_velocity(before_move: Vector3) -> void:
 	if not is_on_floor() or state != State.GROUNDED:
 		return
@@ -365,6 +387,9 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 			landed.emit(air_time)
 		if state == State.GROUNDED and SkateMath.is_seam_normal(tuning, ground_normal, n):
 			n = ground_normal
+		if state != State.GROUNDED:
+			_prev_n = n
+			_curve_load = 0.0
 		ground_normal = n
 		_last_ground_normal = n
 		state = State.GROUNDED
@@ -374,6 +399,9 @@ func _after_move(pre_vel: Vector3, dt: float) -> void:
 			_pop(n, _buffered_charge)
 	else:
 		if state == State.GROUNDED:
+			# Rolled off an edge: carry the carve's turn into the air.
+			_takeoff_spin = _turn_rate
+			_air_spin = _turn_rate
 			state = State.AIR
 		air_time += dt
 		_since_ground += dt

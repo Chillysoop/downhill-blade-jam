@@ -27,7 +27,8 @@
 - **Jump:** hold to crouch, release to pop. A longer hold gives a bigger pop. A quick tap is a small hop.
 - **Hop combos:** hops are cheap and quick on blades. Releasing jump just before you land pops again the moment you touch down, so hops chain. Well-timed hops up step-ups, curbs and off the tops of rollers are a core speedrun skill.
 - **Grind:** jump onto a rail or ledge and you lock on automatically. Jump again to leave it.
-- **Air:** steer to rotate and line up the landing. No trick buttons.
+- **Air:** spin comes from the ground, as in real skating. Leave the ground mid-carve and you keep turning; hold steer as you release a charged jump to wind up a spin. In the air, steering only nudges the spin a little to line up the landing. Landing far off line at speed is a bail; at jogging pace you just step around. No trick buttons.
+- **Pump:** stand up out of the tuck (let go of W) as you drop into a dip or bank, and tuck (W) as you go over the crest, to gain speed without pushing. Mistimed, it costs speed.
 - **Restart:** one button, any time.
 
 ## Out of scope — not building this

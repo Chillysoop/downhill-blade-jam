@@ -113,8 +113,28 @@ extends Resource
 @export var hop_buffer_time: float = 0.15
 
 @export_group("Air")
-## Spin rate (rad/s) when steering in the air.
-@export var air_spin_rate: float = 4.0
+## Yaw spin (rad/s) you can wind up by steering as you pop a fully charged
+## jump. Nothing in the air makes spin: you take it with you from the ground.
+## 6 rad/s is a 360 in about one second of air.
+@export var air_windup_max: float = 6.0
+## Share of air_windup_max a quick tap can wind up. 0: spinning is a
+## deliberate charged pop, so steering through a hop line doesn't spin you.
+@export var air_windup_tap_share: float = 0.0
+## Extra spin (rad/s) steering in the air can add or take off, by moving the
+## arms and body. Small, as for a real skater.
+@export var air_correction_rate: float = 1.2
+## How fast (rad/s²) that in-air correction builds.
+@export var air_correction_accel: float = 4.0
+
+@export_group("Pumping")
+## How far (m) the hips move between a full tuck and standing tall. Standing
+## up while the ground pushes hard on you (in a dip, through a bank) adds
+## speed; crouching while it pushes lightly (over a crest) costs little.
+@export var pump_leg_travel: float = 0.35
+## Share of the leg work that turns into speed.
+@export var pump_efficiency: float = 1.0
+## Smoothing (s) of the felt ground load, so collision noise doesn't pump.
+@export var pump_load_smoothing: float = 0.08
 
 @export_group("Landing")
 ## Share of the into-ground impact speed that is also lost from rolling speed
@@ -132,6 +152,9 @@ extends Resource
 @export_group("Crashing")
 ## Landing with the skates this far (degrees) off the travel direction is a bail.
 @export var crash_land_angle_deg: float = 60.0
+## Below this rolling speed (m/s) a landing that far off line is not a bail:
+## you just step the skates around. About 14 km/h, a fast jog.
+@export var crash_land_angle_min_speed: float = 4.0
 ## Hitting the ground faster than this (m/s, into the surface) is a bail.
 ## 12.5 m/s is a ~8 m drop to flat, about the most legs and pads can take
 ## when rolling out of it.

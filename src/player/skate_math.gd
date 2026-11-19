@@ -168,6 +168,42 @@ static func snap_length(t: SkaterTuning, dt: float) -> float:
 	return t.snap_absorb + 0.5 * t.gravity * dt * dt
 
 
+## Yaw spin (rad/s, positive = turning right) the skater takes into the air:
+## the carve's turn rate at takeoff, plus any wind-up from steering on the pop
+## (bigger on a charged pop). Spin can't be made from nothing once airborne.
+static func air_takeoff_spin(t: SkaterTuning, carve_rate: float, steer: float, charge: float) -> float:
+	var share: float = lerpf(t.air_windup_tap_share, 1.0, clampf(charge, 0.0, 1.0))
+	return carve_rate + clampf(steer, -1.0, 1.0) * t.air_windup_max * share
+
+
+## In-air spin after one step: steering can only nudge it by up to
+## air_correction_rate around the takeoff spin, building at air_correction_accel.
+static func step_air_spin(t: SkaterTuning, spin: float, takeoff_spin: float, steer: float, dt: float) -> float:
+	var target: float = takeoff_spin + clampf(steer, -1.0, 1.0) * t.air_correction_rate
+	return move_toward(spin, target, t.air_correction_accel * dt)
+
+
+## How hard the ground pushes on the skater (m/s², 1 g on the flat): gravity's
+## share into the surface plus the centripetal load of the terrain curving
+## under you, read from how the ground normal turned over one step.
+## Dips and transitions press you down; crests unweight you. Never negative.
+static func ground_load(t: SkaterTuning, n_old: Vector3, n_new: Vector3, travel: Vector3, speed: float, dt: float) -> float:
+	var curve: float = -speed * (n_new - n_old).dot(travel) / maxf(dt, 0.0001)
+	return maxf(t.gravity * n_new.dot(Vector3.UP) + curve, 0.0)
+
+
+## Speed after the body moves by [param crouch_change] (positive = crouching,
+## negative = standing up, in shares of pump_leg_travel) under the terrain's
+## curve load [param curve_load] (m/s²: ground_load minus gravity's share;
+## positive in dips, negative over crests). Gravity's share only lifts or
+## lowers the hips, so on a steady slope nothing changes. Standing up while
+## pressed into a dip, or crouching while unweighted over a crest, turns leg
+## work into speed. That is pumping.
+static func pump_speed(t: SkaterTuning, speed: float, crouch_change: float, curve_load: float) -> float:
+	var work: float = -crouch_change * t.pump_leg_travel * curve_load * t.pump_efficiency
+	return sqrt(maxf(speed * speed + 2.0 * work, 0.0))
+
+
 ## Pop speed for a jump charged for [param charge] (0..1).
 static func pop_speed(t: SkaterTuning, charge: float) -> float:
 	return lerpf(t.pop_min, t.pop_max, clampf(charge, 0.0, 1.0))
@@ -179,7 +215,7 @@ static func judge_landing(t: SkaterTuning, heading: Vector3, velocity: Vector3, 
 	var impact: float = -velocity.dot(normal)
 	var tangential: Vector3 = project_on_plane(velocity, normal)
 	var angle_deg: float = 0.0
-	if tangential.length() > 2.0:
+	if tangential.length() > t.crash_land_angle_min_speed:
 		var h: Vector3 = project_on_plane(heading, normal)
 		if h.length() > 0.01:
 			angle_deg = rad_to_deg(h.normalized().angle_to(tangential.normalized()))

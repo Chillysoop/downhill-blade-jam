@@ -28,6 +28,7 @@ func _init() -> void:
 	test_resistance_never_reverses(t)
 	test_pop_speed_range(t)
 	test_landing_verdicts(t)
+	test_slow_sideways_landing_steps_around(t)
 	test_tuck_takes_time_to_exit(t)
 	test_tuck_blends_drag_and_lean(t)
 	test_grip_drops_with_speed(t)
@@ -39,6 +40,10 @@ func _init() -> void:
 	test_stride_or_tuck(t)
 	test_flatter_normal_is_never_a_seam(t)
 	test_snap_follows_only_what_gravity_can(t)
+	test_air_spin_carries_takeoff_turn(t)
+	test_air_correction_is_small(t)
+	test_ground_load(t)
+	test_pumping_gains_only_with_timing(t)
 	print("SkateMath tests: %s" % ("PASS" if _fails == 0 else "%d FAILED" % _fails))
 	quit(1 if _fails > 0 else 0)
 
@@ -223,6 +228,17 @@ func test_landing_verdicts(t: SkaterTuning) -> void:
 	check(not hard["ok"] and hard["reason"] == "Landed too hard", "hard landing bails")
 
 
+func test_slow_sideways_landing_steps_around(t: SkaterTuning) -> void:
+	# At jogging pace a skater lands a hop turned well off line and just steps
+	# the skates around (a tight slow carve carries ~60-100° into a hop).
+	# 3.5 m/s (12.6 km/h): the bot's tight-carve hop on the test slope that bailed.
+	var v := Vector3(0, -3, -3.5)
+	var turned: Dictionary = SkateMath.judge_landing(t, Vector3.RIGHT, v, Vector3.UP)
+	check(turned["ok"], "a slow hop landed sideways is a step-around, not a bail")
+	var fast: Dictionary = SkateMath.judge_landing(t, Vector3.RIGHT, Vector3(0, -3, -6.0), Vector3.UP)
+	check(not fast["ok"], "sideways at speed still bails")
+
+
 func test_tuck_takes_time_to_exit(t: SkaterTuning) -> void:
 	var amount: float = 1.0
 	var time: float = 0.0
@@ -311,3 +327,51 @@ func test_snap_follows_only_what_gravity_can(t: SkaterTuning) -> void:
 	var snap: float = SkateMath.snap_length(t, 1.0 / 60.0)
 	check(snap > 0.0 and snap < 0.1, "snap is a few centimetres, not a stair step (%.3f m)" % snap)
 	check(snap < 0.17, "a 17 cm stair drop is never glued down")
+
+
+func test_air_spin_carries_takeoff_turn(t: SkaterTuning) -> void:
+	check(is_equal_approx(SkateMath.air_takeoff_spin(t, 1.2, 0.0, 0.0), 1.2), "rolling off a carve keeps its turn")
+	var wound: float = SkateMath.air_takeoff_spin(t, 0.0, 1.0, 1.0)
+	check(is_equal_approx(wound, t.air_windup_max), "full steer on a full pop winds up the most")
+	check(SkateMath.air_takeoff_spin(t, 0.0, 1.0, 0.0) < wound, "a tap winds up less")
+	check(SkateMath.air_takeoff_spin(t, 0.0, -1.0, 1.0) < 0.0, "wind-up follows the steer side")
+
+
+func test_air_correction_is_small(t: SkaterTuning) -> void:
+	var takeoff: float = 0.0
+	var spin: float = takeoff
+	for i: int in 240:
+		spin = SkateMath.step_air_spin(t, spin, takeoff, 1.0, DT)
+	check(is_equal_approx(spin, t.air_correction_rate), "full steer in the air only nudges the spin")
+	check(t.air_correction_rate < 2.0, "in-air correction stays well under a fast spin")
+	spin = SkateMath.step_air_spin(t, 0.0, 3.0, 0.0, DT)
+	check(spin > 0.0 and spin < 3.0, "spin eases toward the takeoff spin, not jumping to it")
+
+
+func test_ground_load(t: SkaterTuning) -> void:
+	var fwd := Vector3.FORWARD
+	check(is_equal_approx(SkateMath.ground_load(t, Vector3.UP, Vector3.UP, fwd, 10.0, DT), t.gravity), "flat ground loads 1 g")
+	# Into a dip the normal swings back against travel: more load.
+	var tilted_fwd: Vector3 = Vector3.UP.rotated(Vector3.RIGHT, deg_to_rad(-1.0))
+	var dip: float = SkateMath.ground_load(t, tilted_fwd, Vector3.UP, fwd, 10.0, DT)
+	check(dip > t.gravity, "a dip presses you into the ground")
+	var crest: float = SkateMath.ground_load(t, Vector3.UP, tilted_fwd, fwd, 10.0, DT)
+	check(crest < t.gravity, "a crest unweights you")
+	check(SkateMath.ground_load(t, Vector3.UP, Vector3.UP.rotated(Vector3.RIGHT, deg_to_rad(-20.0)), fwd, 30.0, DT) >= 0.0, "load never goes negative")
+
+
+func test_pumping_gains_only_with_timing(t: SkaterTuning) -> void:
+	var v: float = 10.0
+	# On the flat or a steady slope (no curve load), crouching or standing
+	# changes nothing: gravity's share only moves your hips up and down.
+	v = SkateMath.pump_speed(t, v, 1.0, 0.0)
+	check(is_equal_approx(v, 10.0), "crouching on the flat costs nothing")
+	v = SkateMath.pump_speed(t, v, -1.0, 0.0)
+	check(is_equal_approx(v, 10.0), "standing up on the flat gains nothing")
+	# Stand up in the dip (pressed down), crouch over the crest (unweighted): gain.
+	var good: float = SkateMath.pump_speed(t, SkateMath.pump_speed(t, 10.0, -1.0, 0.6 * t.gravity), 1.0, -0.5 * t.gravity)
+	check(good > 10.1, "well-timed pump gains speed (%.3f)" % good)
+	# Backwards timing loses it.
+	var bad: float = SkateMath.pump_speed(t, SkateMath.pump_speed(t, 10.0, 1.0, 0.6 * t.gravity), -1.0, -0.5 * t.gravity)
+	check(bad < 10.0, "badly timed pump costs speed")
+	check(SkateMath.pump_speed(t, 0.1, 1.0, 3.0 * t.gravity) >= 0.0, "pumping never makes speed negative")
