@@ -37,8 +37,12 @@ First course: `assets/data/course_copperline_mountain.json`, designed in
 | `crown` | Curve: how much higher the fan's centre is than its edges (convex fan) |
 | `tilt` | Curve: cross-slope in degrees (+ = west side lower) so the fall line twists |
 | `noise` | `large_amp`/`large_wavelength`, `small_amp`/`small_wavelength` (m) |
-| `margin` | Valley walls past the fan edge: `wall_deg`, `cap` (max height), `wander`/`wander_wavelength` (edge wobble), `rock_above` (wall turns to rock above this height) |
+| `margin` | Valley walls past the fan edge: `wall_deg`, `cap` (max height), `wander`/`wander_wavelength` (edge wobble), `rock_above` (wall turns to rock this far above the bank top), optional rideable bank first: `bank_width`, `bank_height`, `bank_surface` (smooth rise, flat at the fan edge) |
 | `rock_slope_deg` | Anything steeper is painted rock (it is also a wall to the skater) |
+| `fan_surface` | Surface of the whole fan before stamps (default `grass`; open-form courses use `concrete`) |
+| `soft_edges` | `true` blurs surface colours over neighbouring vertices so rough patches have soft, rounded edges (look only) |
+| `landforms` | Open-form smooth terrain, below |
+| `rough` | Noise-shaped slow patches, below |
 | `concrete_zones` | Whole-width concrete bands: `z_from`, `z_to`, `u_limit` |
 | `bands` | Concrete paint along a spline: `points`, `width`, optional `wander`, `keep` (surfaces it won't paint over; default gravel and rock) |
 | `channels` | Carved concrete strands: `points`, `width`, `depth`, `floor_frac` (flat share of the width), `wander`, `taper`/`taper_in`/`taper_out` (depth fades in/out over this length), `rim_width`/`rim_surface` |
@@ -47,8 +51,20 @@ First course: `assets/data/course_copperline_mountain.json`, designed in
 | `bars` | Raised strips along a spline: `points`, `height`, `edge`, `widths` (`[x, width]` knots), `surface`, `cuts` (`x`, `width`, `flare`: concrete gaps through the bar) |
 | `steps` | Cliff bands and drop lips. A wavy line `z` + `wave_amp`·sin(2πx/`wave_length`); ground below it drops by each x-zone's `profile` of `[s, drop]` (s = metres below the line, negative = above it). `extends_down` keeps the full drop to the bottom of the map; otherwise the profile must return to 0. Zones may set `surface` between `surface_from` and `surface_to` |
 
+### Open-form stamps (fluid, ride-anywhere terrain)
+
+`landforms` entries (every profile eases to zero with a cosine, so the ground never kinks):
+
+| `type` | Keys | Shape |
+|---|---|---|
+| `hill` | `x`, `z`, `rx`, `rz` (default rx), `yaw`, `height` (negative = bowl), `plateau` (0–0.95 flat-top share) | Smooth mound, tabletop or bowl |
+| `ridge` | `points`, `width`, `height` (negative = gully), `plateau`, `taper` (ends fade over this length), `wander` | Spine or natural halfpipe along a spline |
+| `rollers` | `z_from`, `z_to`, `u_from`, `u_to`, `amp`, `wavelength`, `angle` (deg off straight across), `fade` (m), `vary` (0–1 noise), `seed` | Rolling waves over a region |
+
+`rough` entries: `surface` (`grass`/`gravel`), region (`z_from`, `z_to`, `u_from`, `u_to`), `wavelength` (patch size), `threshold` (higher = less rough), `centre_bias` + `centre_u` + `bias_width` (more rough near that across-fan position), `seed`, `keep` (surfaces left alone; rock always is).
+
 Surfaces: `concrete` (fast), `grass` (slow), `gravel` (slow), `rock` (crash faces).
-Stamp order: base → bands → channels → islands → islets → bars → steps → steepness.
+Stamp order: base → streets → landforms → rough → bands → channels → islands → islets → bars → steps → steepness.
 
 ## `gates`
 

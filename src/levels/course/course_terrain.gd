@@ -53,6 +53,12 @@ func build(data: Dictionary) -> void:
 	_lock.fill(0)
 	for st: Dictionary in data.get("streets", []):
 		_stamp_street(st)
+	# Open-form terrain (fluid, ride-anywhere): smooth landforms, then
+	# noise-shaped rough patches. Both are opt-in from data.
+	for lf: Dictionary in data.get("landforms", []):
+		_stamp_landform(lf)
+	for rf: Dictionary in data.get("rough", []):
+		_paint_rough(rf)
 	# Order matters: surface bands, then carved channels, then raised islands
 	# and bars on top, then cliff steps, then the steepness (rock) pass.
 	for band: Dictionary in data.get("bands", []):
@@ -141,6 +147,11 @@ func _base_pass() -> void:
 	var m_wander: float = float(margin["wander"])
 	var m_wander_wl: float = float(margin["wander_wavelength"])
 	var m_rock_above: float = float(margin["rock_above"])
+	# Optional rideable bank between the fan and the valley wall.
+	var bank_w: float = float(margin.get("bank_width", 0.0))
+	var bank_h: float = float(margin.get("bank_height", 0.0))
+	var bank_surf: int = _surface_id(margin.get("bank_surface", "grass"))
+	var fan_surf: int = _surface_id(_data.get("fan_surface", "grass"))
 	_axis_row.resize(nz)
 	_half_row.resize(nz)
 	# City courses: lot heights come from the street level grid instead of
@@ -174,13 +185,15 @@ func _base_pass() -> void:
 				h += crown_h * (1.0 - u * u)
 			var wall: float = 0.0
 			if au > 1.0:
-				wall = minf((au - 1.0) * edge * m_tan, m_cap)
+				wall = CourseMath.bank_rise((au - 1.0) * edge, bank_w, bank_h, m_tan, m_cap)
 				h += wall
 			h += amp_l * _noise_large.get_noise_2d(x, z)
 			h += amp_s * _noise_small.get_noise_2d(x, z)
 			heights[row + ix] = h
-			var s: int = Surface.GRASS
-			if wall > m_rock_above:
+			var s: int = fan_surf
+			if au > 1.0:
+				s = bank_surf if (au - 1.0) * edge <= bank_w else Surface.GRASS
+			if wall > bank_h + m_rock_above:
 				s = Surface.ROCK
 			surfaces[row + ix] = s
 	# Concrete zones: whole-width bands of the fan (apex, pans, toe).
@@ -403,6 +416,186 @@ func _stamp_street(def: Dictionary) -> void:
 			elif d < half + feather and _lock[i] == 0:
 				var k: float = smoothstep(0.0, 1.0, (d - half) / feather)
 				heights[i] = lerpf(sy[li], heights[i], k)
+
+
+## Stamps one open-form landform. Types:
+## [code]hill[/code] (ellipse [code]x z rx rz yaw height plateau[/code];
+## negative height = bowl), [code]ridge[/code] (spline [code]points width
+## height plateau taper wander[/code]; negative height = gully) and
+## [code]rollers[/code] (waves in a fan region). See docs/course-data-schema.md.
+func _stamp_landform(lf: Dictionary) -> void:
+	match String(lf.get("type", "hill")):
+		"hill":
+			_stamp_hill(lf)
+		"ridge":
+			_stamp_ridge(lf)
+		"rollers":
+			_stamp_rollers(lf)
+		_:
+			push_warning("CourseTerrain: unknown landform type %s" % lf.get("type"))
+
+
+func _stamp_hill(lf: Dictionary) -> void:
+	var c := Vector2(float(lf["x"]), float(lf["z"]))
+	var rx: float = float(lf["rx"])
+	var rz: float = float(lf.get("rz", rx))
+	var yaw: float = deg_to_rad(float(lf.get("yaw", 0.0)))
+	var height: float = float(lf["height"])
+	var plateau: float = float(lf.get("plateau", 0.0))
+	var reach: float = maxf(rx, rz) + cell
+	var r: Array[int] = _cell_range(c.x - reach, c.x + reach, c.y - reach, c.y + reach)
+	for iz: int in range(r[2], r[3] + 1):
+		for ix: int in range(r[0], r[1] + 1):
+			var d: Vector2 = (Vector2(col_x(ix), row_z(iz)) - c).rotated(-yaw)
+			var n: float = sqrt(pow(d.x / rx, 2.0) + pow(d.y / rz, 2.0))
+			if n < 1.0:
+				heights[iz * nx + ix] += CourseMath.landform_profile(n, height, plateau)
+
+
+func _stamp_ridge(lf: Dictionary) -> void:
+	var pts: PackedVector2Array = _line_points(lf)
+	if pts.size() < 2:
+		return
+	var half: float = float(lf["width"]) * 0.5
+	var height: float = float(lf["height"])
+	var plateau: float = float(lf.get("plateau", 0.0))
+	var taper: float = float(lf.get("taper", half * 2.0))
+	var f: Dictionary = _line_field(pts, half + cell)
+	var r: Array = f["r"]
+	var w: int = f["w"]
+	var dist: PackedFloat32Array = f["dist"]
+	var along: PackedFloat32Array = f["along"]
+	var total: float = f["total"]
+	for iz: int in range(r[2], r[3] + 1):
+		for ix: int in range(r[0], r[1] + 1):
+			var li: int = (iz - r[2]) * w + ix - r[0]
+			if dist[li] >= half:
+				continue
+			var al: float = along[li]
+			var fade: float = clampf(minf(al, total - al) / maxf(taper, 0.01), 0.0, 1.0)
+			fade = fade * fade * (3.0 - 2.0 * fade)
+			heights[iz * nx + ix] += CourseMath.landform_profile(dist[li] / half, height * fade, plateau)
+
+
+## Distance from every cell near polyline [param pts] (within [param reach])
+## to the line, and how far along the line its nearest point is.
+func _line_field(pts: PackedVector2Array, reach: float) -> Dictionary:
+	var minx: float = INF
+	var maxx: float = -INF
+	var minz: float = INF
+	var maxz: float = -INF
+	for p: Vector2 in pts:
+		minx = minf(minx, p.x)
+		maxx = maxf(maxx, p.x)
+		minz = minf(minz, p.y)
+		maxz = maxf(maxz, p.y)
+	var r: Array[int] = _cell_range(minx - reach, maxx + reach, minz - reach, maxz + reach)
+	var w: int = r[1] - r[0] + 1
+	var hgt: int = r[3] - r[2] + 1
+	var dist := PackedFloat32Array()
+	dist.resize(w * hgt)
+	dist.fill(INF)
+	var along := PackedFloat32Array()
+	along.resize(w * hgt)
+	var cum: float = 0.0
+	for k: int in range(1, pts.size()):
+		var a: Vector2 = pts[k - 1]
+		var b: Vector2 = pts[k]
+		var seg: float = a.distance_to(b)
+		var sr: Array[int] = _cell_range(minf(a.x, b.x) - reach, maxf(a.x, b.x) + reach, minf(a.y, b.y) - reach, maxf(a.y, b.y) + reach)
+		for iz: int in range(sr[2], sr[3] + 1):
+			var pz: float = row_z(iz)
+			var lrow: int = (iz - r[2]) * w - r[0]
+			for ix: int in range(sr[0], sr[1] + 1):
+				var p := Vector2(col_x(ix), pz)
+				var d: float = CourseMath.dist_to_segment(p, a, b)
+				var li: int = lrow + ix
+				if d < dist[li]:
+					dist[li] = d
+					var t: float = clampf((p - a).dot(b - a) / maxf(seg * seg, 0.0001), 0.0, 1.0)
+					along[li] = cum + t * seg
+		cum += seg
+	return {"r": r, "w": w, "dist": dist, "along": along, "total": cum}
+
+
+## Rolling waves across a fan region ([code]z_from z_to u_from u_to[/code]):
+## [code]amp[/code] high, [code]wavelength[/code] apart, turned by
+## [code]angle[/code] degrees from straight across the fall line, faded in
+## over [code]fade[/code] metres at the region's ends and broken up by noise
+## so no two rollers match.
+func _stamp_rollers(lf: Dictionary) -> void:
+	var z0: float = float(lf["z_from"])
+	var z1: float = float(lf["z_to"])
+	var u0: float = float(lf.get("u_from", -1.0))
+	var u1: float = float(lf.get("u_to", 1.0))
+	var amp: float = float(lf["amp"])
+	var wl: float = float(lf["wavelength"])
+	var ang: float = deg_to_rad(float(lf.get("angle", 0.0)))
+	var fade_m: float = float(lf.get("fade", 30.0))
+	var vary: float = clampf(float(lf.get("vary", 0.4)), 0.0, 1.0)
+	var nz_: FastNoiseLite = FastNoiseLite.new()
+	_setup_noise(nz_, int(lf.get("seed", 7)), wl * 2.5)
+	var r: Array[int] = _cell_range(x_min, x_min, z0, z1)
+	r[0] = 0
+	r[1] = nx - 1
+	var ca: float = cos(ang)
+	var sa: float = sin(ang)
+	for iz: int in range(r[2], r[3] + 1):
+		var z: float = row_z(iz)
+		var fz: float = clampf(minf(z0 - z, z - z1) / maxf(fade_m, 0.01), 0.0, 1.0)
+		var half: float = _half_row[iz]
+		var axis: float = _axis_row[iz]
+		for ix: int in range(r[0], r[1] + 1):
+			var x: float = col_x(ix)
+			var u: float = (x - axis) / half
+			if u < u0 or u > u1:
+				continue
+			var fu: float = clampf(minf(u - u0, u1 - u) * half / maxf(fade_m, 0.01), 0.0, 1.0)
+			var s: float = -z * ca + x * sa
+			var k: float = 1.0 - vary + vary * (0.5 + 0.5 * nz_.get_noise_2d(x, z))
+			heights[iz * nx + ix] += amp * k * fz * fu * sin(s / wl * TAU)
+
+
+## Paints noise-shaped patches of a slow [code]surface[/code] inside a fan
+## region: a cell turns rough where noise (feature size
+## [code]wavelength[/code]) plus [code]centre_bias[/code] (strongest at
+## [code]centre_u[/code], gone [code]bias_width[/code] away in u) exceeds
+## [code]threshold[/code]. Rock and anything listed in [code]keep[/code] stays.
+func _paint_rough(rf: Dictionary) -> void:
+	var surf: int = _surface_id(rf.get("surface", "grass"))
+	var z0: float = float(rf.get("z_from", INF))
+	var z1: float = float(rf.get("z_to", -INF))
+	var u0: float = float(rf.get("u_from", -1.0))
+	var u1: float = float(rf.get("u_to", 1.0))
+	var thr: float = float(rf.get("threshold", 0.3))
+	var bias: float = float(rf.get("centre_bias", 0.0))
+	var cu: float = float(rf.get("centre_u", 0.0))
+	var bw: float = maxf(float(rf.get("bias_width", 0.5)), 0.01)
+	var keep_ids: Array[int] = [Surface.ROCK]
+	for k: String in rf.get("keep", []):
+		keep_ids.append(_surface_id(k))
+	var n1 := FastNoiseLite.new()
+	_setup_noise(n1, int(rf.get("seed", 3)), float(rf.get("wavelength", 80.0)))
+	var n2 := FastNoiseLite.new()
+	_setup_noise(n2, int(rf.get("seed", 3)) + 101, float(rf.get("wavelength", 80.0)) * 0.3)
+	for iz: int in nz:
+		var z: float = row_z(iz)
+		if z > z0 or z < z1:
+			continue
+		var half: float = _half_row[iz]
+		var axis: float = _axis_row[iz]
+		for ix: int in nx:
+			var x: float = col_x(ix)
+			var u: float = (x - axis) / half
+			if u < u0 or u > u1:
+				continue
+			var i: int = iz * nx + ix
+			if surfaces[i] in keep_ids:
+				continue
+			var v: float = n1.get_noise_2d(x, z) * 0.8 + n2.get_noise_2d(x, z) * 0.2
+			v += bias * maxf(0.0, 1.0 - absf(u - cu) / bw)
+			if v > thr:
+				surfaces[i] = surf
 
 
 ## Scattered braid islets (seeded) inside a fan region, kept clear of the
