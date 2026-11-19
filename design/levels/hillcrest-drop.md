@@ -166,6 +166,16 @@ Target time: unknown until playtested. Estimate from average speed 16-20 m/s ove
 - **Edge cases:** respawn pads are on intersection centres so no pad is inside a building; walkers never cross the House Jump or Steps entries; the cable car and cross traffic loops are on the run clock (identical every restart).
 - **Evidence:** `production/qa/evidence/hillcrest-drop-2026-11-04/`.
 
+## 10b. Open-form pass (2026-11-19)
+
+Conner: *"make the levels way more fluid and open form"*, *"think mx vs atv big open world maps, but more limited and downhill for us"*, *"the entire map can ebb left and right, so you can't just bomb straight down"*. Decision (Conner): **open city** (keep the streets, open about half the blocks).
+
+- **Open blocks:** a checkerboard of blocks (`is_open(r, c)`: (row + gap) even) has no buildings. Each is the smooth paved lot plane between its four intersections, with **no curbs or parked cars along its edges**, so you roll straight off any street into it and out the other side. Diagonal neighbours meet at intersections, so open blocks chain from the summit to the Bayfront.
+- **Dressing (sparse, lines stay free):** parks get two smooth mounds (1.6-3 m) and tree clumps; plazas get a shallow bowl (2.4 m deep), a fountain, benches and a few people; parking lots have bays running downhill with wide aisles.
+- **The hill ebbs:** every intersection height gets a sideways lean of up to ±7 m at the grid edges that swings left-right-left over 520 m down the hill (`EBB_AMP`, `EBB_WAVELENGTH`). Cross streets now slope one way then the other, the low side of the hill wanders, and the steepest street changes block to block (e.g. Tidewater runs 12, 22, 16, 5, 11, 20, 22% while Quarry runs 10, 5, 13, 24, 22, 11, 4%). No block drops less than 4 m, so nothing goes uphill and there are still no dead ends.
+- Hillcrest Ave (x = 0) is the pivot of the lean, so the House Jump and the Steps keep their numbers.
+- Test bot: diagonal "open" route through the chain rides at 40-48 km/h across the blocks; it stalls only where it steers into parked bays or trees (it doesn't dodge).
+
 ## 11. Playtest notes (test bot, greybox v1)
 
 - Drop-in to Crest Way from standing: ≈ 47 km/h at the crown; first crown air 0.7 s.
