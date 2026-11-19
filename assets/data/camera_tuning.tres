@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CameraTuning" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/camera/camera_tuning.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+distance = 7.5
+height = 4.8
+look_ahead = 16.0
+aim_height = 0.0
+slope_follow = 1.0
+slope_sharpness = 3.0
+grade_min = -1.5
+grade_max = 0.5
+follow_sharpness = 7.0
+turn_sharpness = 4.0
+min_travel_speed = 2.0
+clearance = 0.4
+collision_mask = 1
+fov_slow = 70.0
+fov_fast = 92.0
+fov_speed_ref = 35.0
+fov_sharpness = 3.0

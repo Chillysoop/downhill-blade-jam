@@ -1,0 +1,4 @@
+Reviewed-Content-Hash: src/camera/chase_camera.gd 1743124c18e597f48168f16298c4711f101121d3
+Reviewed-Content-Hash: src/camera/camera_tuning.gd 6ef852e3351a95383d574c8fe2dc2ef3ddcf33fe
+Reviewed-Content-Hash: assets/data/camera_tuning.tres 6aacc9a0c57e6ab0775a5c896e668e8eb6532779
+Reviewed-Content-Hash: src/main.gd 2ee9ec04f6e7a9087f4629da1f5ef38600922632

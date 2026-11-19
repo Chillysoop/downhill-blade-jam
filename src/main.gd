@@ -104,6 +104,7 @@ func _ready() -> void:
 
 	camera = ChaseCamera.new()
 	camera.target = skater
+	camera.tuning = load("res://assets/data/camera_tuning.tres") as CameraTuning
 	add_child(camera)
 	camera.make_current()
 
