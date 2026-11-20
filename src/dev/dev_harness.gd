@@ -9,6 +9,8 @@ extends Node
 ##   --hops-after=<s>       only start hopping after <s> seconds
 ##   --brake-at=<s>         during autopilot, let go of forward and brake from <s> seconds
 ##   --steer=<v>            during autopilot, hold this steer (-1..1) instead of lane keeping
+##   --flip-at=<s>          turn the skater's feet 180° at <s> seconds (rides fakie)
+##   --coast=<a,b>          during autopilot, let go of forward from <a> to <b> seconds
 ##   --quit-after=<s>       quit after <s> seconds
 ##   --course=<path|test_slope>  load another course (read by main.gd)
 ##   --route=<name>         autopilot follows a named course route (tucks, steers);
@@ -69,7 +71,11 @@ func _ready() -> void:
 				steer = float(args["steer"])
 			var jump: bool = _jump_held > 0.0
 			var braking: bool = args.has("brake-at") and _t >= float(args["brake-at"])
-			return {"steer": steer, "forward": 0.0 if braking else 1.0,
+			var coasting: bool = false
+			if args.has("coast"):
+				var c: PackedStringArray = String(args["coast"]).split(",")
+				coasting = _t >= float(c[0]) and _t < float(c[1])
+			return {"steer": steer, "forward": 0.0 if braking or coasting else 1.0,
 				"brake": 1.0 if braking else 0.0, "jump": jump}
 	if args.has("no-people") and course != null and course._kit != null and course._kit._city != null:
 		course._kit._city.remove_people_and_traffic()
@@ -148,10 +154,17 @@ func _physics_process(dt: float) -> void:
 	if hop_every > 0.0 and _t >= _next_hop and _t >= float(args.get("hops-after", "0")):
 		_jump_held = 0.08
 		_next_hop += hop_every
+	if args.has("flip-at") and _t >= float(args["flip-at"]):
+		args.erase("flip-at")
+		skater.heading = -skater.heading
 	if args.has("telemetry") and _t >= _next_tel:
 		_next_tel += 0.5
 		var p: Vector3 = skater.global_position
 		var mode: String = "slide" if skater.sliding else ("tuck" if skater.tucking else ("stride" if skater.striding else ""))
+		if skater.turning_around:
+			mode = "turnaround"
+		elif skater.fakie:
+			mode += " fakie"
 		print("t=%5.2f pos=(%6.1f,%6.1f,%7.1f) speed=%5.1f km/h state=%s lean=%3.0f %s" % [
 			_t, p.x, p.y, p.z, skater.get_speed() * 3.6, Skater.State.keys()[skater.state],
 			rad_to_deg(skater.lean), mode])

@@ -8,6 +8,7 @@ var _best_label: Label
 var _banner: Label
 var _banner_time: float = 0.0
 var _ground_label: Label
+var _carve_meter: CarveMeter
 
 
 func _ready() -> void:
@@ -24,9 +25,16 @@ func _ready() -> void:
 	_ground_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ground_label.offset_left = -300.0
 	_ground_label.offset_right = 300.0
-	_ground_label.offset_top = -130.0
-	_ground_label.offset_bottom = -90.0
+	_ground_label.offset_top = -215.0
+	_ground_label.offset_bottom = -175.0
 	_ground_label.modulate = Color(1.0, 0.78, 0.35)
+	_carve_meter = CarveMeter.new()
+	_carve_meter.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_carve_meter.offset_left = -140.0
+	_carve_meter.offset_right = 140.0
+	_carve_meter.offset_top = -170.0
+	_carve_meter.offset_bottom = -56.0
+	add_child(_carve_meter)
 	var hint := _label(Vector2(24, 0), 18)
 	hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	hint.offset_left = 24.0
@@ -47,7 +55,7 @@ func _ready() -> void:
 ## Updates the timer and speed readouts.
 func show_run(time_s: float, speed_ms: float, best_s: float) -> void:
 	_timer_label.text = format_time(time_s)
-	_speed_label.text = "%d km/h" % roundi(speed_ms * 3.6)
+	_speed_label.text = format_speed(speed_ms)
 	_best_label.text = "Best  " + (format_time(best_s) if best_s > 0.0 else "--:--.--")
 
 
@@ -69,6 +77,16 @@ func _process(dt: float) -> void:
 		_banner_time -= dt
 		if _banner_time <= 0.0:
 			_banner.text = ""
+
+
+## Formats a speed in m/s as whole miles per hour.
+static func format_speed(speed_ms: float) -> String:
+	return "%d mph" % roundi(speed_ms * 2.2369363)
+
+
+## Shows the carve meter for [param skater].
+func show_carve_meter(skater: Skater) -> void:
+	_carve_meter.skater = skater
 
 
 ## Formats seconds as M:SS.cc.

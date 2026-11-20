@@ -31,6 +31,13 @@ func _init() -> void:
 	test_carves_are_sharp(t)
 	test_tucked_carves_still_turn(t)
 	test_lean_is_quick(t)
+	test_fakie_landing_rolls_away(t)
+	test_fakie_landing_straightens_backwards(t)
+	test_is_fakie(t)
+	test_turnaround_is_a_quick_mohawk(t)
+	test_tightest_radius_follows_speed(t)
+	test_slow_footwork_is_nimble(t)
+	test_first_push_bites_at_once(t)
 	test_slow_sideways_landing_steps_around(t)
 	test_tuck_takes_time_to_exit(t)
 	test_tuck_blends_drag_and_lean(t)
@@ -92,7 +99,7 @@ func test_carve_radius_follows_physics(t: SkaterTuning) -> void:
 
 func test_slow_turns_are_capped(t: SkaterTuning) -> void:
 	var lean: float = deg_to_rad(t.lean_max_deg)
-	var v: float = 3.0
+	var v: float = 1.0
 	var w: float = SkateMath.carve_turn_rate(t, v, lean)
 	check(absf(w - maxf(v / t.min_turn_radius, t.pivot_turn_rate)) < 0.001, "footwork limits the tightest slow turn")
 	check(is_equal_approx(SkateMath.carve_turn_rate(t, 0.0, lean), t.pivot_turn_rate), "can step around when stopped")
@@ -424,3 +431,72 @@ func test_lean_is_quick(t: SkaterTuning) -> void:
 		lean = SkateMath.step_lean(t, lean, 1.0, 0.0, DT)
 		time += DT
 	check(time <= 0.16, "edge to full lean in under 0.16 s (%.2f)" % time)
+
+
+func test_fakie_landing_rolls_away(t: SkaterTuning) -> void:
+	# A 180 landed backwards is a clean fakie landing, as on real skates.
+	var v := Vector3(0, -5, -15)
+	var fakie: Dictionary = SkateMath.judge_landing(t, Vector3.BACK, v, Vector3.UP)
+	check(fakie["ok"], "landing backwards is clean")
+	check(fakie.get("fakie", false), "and is reported as fakie")
+	check(not SkateMath.judge_landing(t, Vector3.FORWARD, v, Vector3.UP).get("fakie", true), "a forward landing is not fakie")
+	var off: Vector3 = Vector3.BACK.rotated(Vector3.UP, deg_to_rad(t.crash_land_angle_deg + 20.0))
+	check(not SkateMath.judge_landing(t, off, v, Vector3.UP)["ok"], "landing between forward and backwards at speed still bails")
+
+
+func test_fakie_landing_straightens_backwards(t: SkaterTuning) -> void:
+	var v := Vector3(0, 0, -15)
+	var h: Vector3 = Vector3.BACK.rotated(Vector3.UP, deg_to_rad(t.landing_align_deg * 0.5))
+	var out: Vector3 = SkateMath.landing_heading(t, h, v, Vector3.UP)
+	check(out.is_equal_approx(Vector3.BACK), "a nearly backwards landing straightens to exactly backwards")
+
+
+func test_is_fakie(t: SkaterTuning) -> void:
+	check(SkateMath.is_fakie(t, Vector3.FORWARD, Vector3(0, 0, 5)), "rolling toward your heels is fakie")
+	check(not SkateMath.is_fakie(t, Vector3.FORWARD, Vector3(0, 0, -5)), "rolling toward your toes is not")
+	check(not SkateMath.is_fakie(t, Vector3.FORWARD, Vector3(0, 0, t.fakie_min_speed * 0.5)), "barely moving is not fakie")
+
+
+func test_turnaround_is_a_quick_mohawk(t: SkaterTuning) -> void:
+	# Rolling backwards, a skater opens the hips and steps round to forwards.
+	var travel := Vector3.FORWARD
+	var h := Vector3.BACK
+	var time: float = 0.0
+	while h.angle_to(travel) > 0.01 and time < 2.0:
+		h = SkateMath.step_turnaround(t, h, travel, Vector3.UP, 0.0, DT)
+		time += DT
+	check(time <= t.turnaround_time + 0.02, "turning round takes about turnaround_time (%.2f s)" % time)
+	check(t.turnaround_time <= 0.45, "a mohawk step is quick")
+	var right: Vector3 = SkateMath.step_turnaround(t, Vector3.BACK, travel, Vector3.UP, 1.0, 0.05)
+	var left: Vector3 = SkateMath.step_turnaround(t, Vector3.BACK, travel, Vector3.UP, -1.0, 0.05)
+	check(right.x * left.x < 0.0, "steer picks which way you open up")
+
+
+func test_tightest_radius_follows_speed(t: SkaterTuning) -> void:
+	var v30: float = 30.0 / 3.6
+	var r30: float = SkateMath.tightest_radius(t, v30, 0.0)
+	check(is_equal_approx(r30, v30 / SkateMath.carve_turn_rate(t, v30, deg_to_rad(t.lean_max_deg))), "at 30 km/h the lean sets the tightest turn")
+	var v90: float = 25.0
+	var lean_r: float = v90 / SkateMath.carve_turn_rate(t, v90, deg_to_rad(t.lean_max_deg))
+	check(SkateMath.tightest_radius(t, v90, 0.0) > lean_r, "at 90 km/h the wheels' grip sets it (wider than the lean)")
+	check(SkateMath.tightest_radius(t, v30, 1.0) > r30, "a tuck widens it")
+	check(SkateMath.tightest_radius(t, 20.0, 0.0) > SkateMath.tightest_radius(t, 10.0, 0.0), "faster is wider")
+
+
+func test_slow_footwork_is_nimble(t: SkaterTuning) -> void:
+	# Standing, a skater spins round on the spot in about half a second.
+	check(PI / SkateMath.carve_turn_rate(t, 0.0, deg_to_rad(t.lean_max_deg)) <= 0.55, "180 on the spot in about half a second")
+	# At a jog (11 km/h) the tightest circle is under a metre.
+	check(SkateMath.tightest_radius(t, 3.0, 0.0) <= 1.0, "under 1 m radius at a jog (%.2f)" % SkateMath.tightest_radius(t, 3.0, 0.0))
+	# Edge to edge (full left lean to full right) in about a fifth of a second.
+	var lean: float = -deg_to_rad(t.lean_max_deg)
+	var time: float = 0.0
+	while lean < deg_to_rad(t.lean_max_deg) - 0.001 and time < 1.0:
+		lean = SkateMath.step_lean(t, lean, 1.0, 0.0, DT)
+		time += DT
+	check(time <= 0.23, "edge to edge in under 0.23 s (%.2f)" % time)
+
+
+func test_first_push_bites_at_once(t: SkaterTuning) -> void:
+	var p0: float = SkateMath.stride_start_phase(t)
+	check(SkateMath.stride_accel(t, 0.0, p0) >= 0.6 * t.stride_peak_accel, "the first push bites the moment you press")

@@ -110,6 +110,7 @@ func _ready() -> void:
 
 	hud = Hud.new()
 	add_child(hud)
+	hud.show_carve_meter(skater)
 
 	menu = RunMenu.new()
 	add_child(menu)

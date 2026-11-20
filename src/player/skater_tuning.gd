@@ -53,6 +53,9 @@ extends Resource
 ## strength limit. 7.4 averages ~3.3 m/s² over a stroke, a sprint start
 ## (15 km/h in ~1.3 s, 20 km/h in ~2 s).
 @export var stride_peak_accel: float = 7.4
+## When you first press forward the stroke starts this share of the way into
+## its push, so the first push bites at once (a sprint start).
+@export var stride_start_share: float = 0.25
 ## Leg power per kg of skater (W/kg), averaged over strokes. Above walking
 ## pace the push is power-limited (a = P / v). Sprinters make 14-15 W/kg for
 ## 30 s and 10-11 W/kg over a minute (Stangier et al. 2016); 10 W/kg holds
@@ -68,8 +71,8 @@ extends Resource
 ## about 0.7 g (a 27 m arc at 50 km/h).
 @export var lean_max_tuck_deg: float = 36.0
 ## How fast the body rolls onto its edges, degrees per second (full lean in
-## about 0.15 s, a quick edge change).
-@export var lean_rate_deg: float = 340.0
+## about 0.1 s; edge to edge in about 0.2 s).
+@export var lean_rate_deg: float = 480.0
 ## Sideways grip of the wheels as a friction coefficient. Soft (82-85A)
 ## outdoor urethane on smooth concrete grips about 1.2-1.3.
 ## Asking for more turn than this makes the skates slide.
@@ -87,9 +90,10 @@ extends Resource
 ## Sharper turns cost more speed.
 @export var carve_scrub: float = 0.04
 ## Tightest turning circle radius (m) at low speed, with a scissored stance.
-@export var min_turn_radius: float = 1.2
-## Turn rate (rad/s) when nearly stopped, by stepping the skates around.
-@export var pivot_turn_rate: float = 3.0
+@export var min_turn_radius: float = 0.8
+## Turn rate (rad/s) when nearly stopped, by stepping the skates around:
+## a 180 on the spot in about half a second.
+@export var pivot_turn_rate: float = 6.0
 
 @export_group("Braking")
 ## T-stop deceleration (m/s²): the trailing skate dragged sideways behind the
@@ -106,6 +110,13 @@ extends Resource
 ## Braking after crossing the finish (not player braking), m/s². A game value
 ## so runs stop before the end wall.
 @export var auto_brake_decel: float = 12.0
+
+@export_group("Fakie")
+## Rolling toward your heels faster than this (m/s) is riding fakie.
+@export var fakie_min_speed: float = 0.5
+## Seconds to turn round from fakie to forwards (a mohawk step) when you press
+## forward while rolling backwards. The speed carries on; only the feet turn.
+@export var turnaround_time: float = 0.35
 
 @export_group("Jumping")
 ## Pop speed (m/s) for a tap of jump. 3.4 m/s is a ~0.6 m hop, enough to

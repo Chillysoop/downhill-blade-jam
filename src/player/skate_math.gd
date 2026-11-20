@@ -128,14 +128,59 @@ static func landing_velocity(t: SkaterTuning, velocity: Vector3, n: Vector3) -> 
 ## Skate direction just after touching down: within landing_align_deg of the
 ## travel direction the feet straighten out onto it; further off, the skates
 ## stay where they point and the wheels scrub off the sideways speed.
+## Landing backwards (a 180) straightens the same way onto the reverse of
+## the travel direction: you roll away fakie.
 static func landing_heading(t: SkaterTuning, heading: Vector3, velocity: Vector3, n: Vector3) -> Vector3:
 	var h: Vector3 = project_on_plane(heading, n)
 	var v: Vector3 = project_on_plane(velocity, n)
 	if v.length() < 1.0 or h.length() < 0.01:
 		return heading
-	if rad_to_deg(h.angle_to(v)) <= t.landing_align_deg:
+	var ang: float = rad_to_deg(h.angle_to(v))
+	if ang <= t.landing_align_deg:
 		return v.normalized()
+	if ang >= 180.0 - t.landing_align_deg:
+		return -v.normalized()
 	return h.normalized()
+
+
+## True when the skater is rolling toward their heels (backwards, "fakie")
+## faster than fakie_min_speed.
+static func is_fakie(t: SkaterTuning, heading: Vector3, velocity: Vector3) -> bool:
+	return velocity.dot(heading) < -t.fakie_min_speed
+
+
+## One step of turning round from backwards to forwards (a mohawk step): the
+## skates swing toward [param travel] at PI / turnaround_time rad/s, opening
+## toward the [param steer] side (right when steer is 0 or positive). The
+## speed keeps going the same way; only the feet turn.
+static func step_turnaround(t: SkaterTuning, heading: Vector3, travel: Vector3, n: Vector3, steer: float, dt: float) -> Vector3:
+	var h: Vector3 = project_on_plane(heading, n).normalized()
+	var goal: Vector3 = project_on_plane(travel, n).normalized()
+	var left_to_go: float = h.angle_to(goal)
+	var step: float = PI / maxf(t.turnaround_time, 0.01) * dt
+	if left_to_go <= step:
+		return goal
+	# Which way round: the side the steer picks while the feet are still near
+	# backwards, otherwise the shorter way.
+	var side: float = signf(h.cross(goal).dot(n))
+	if left_to_go > PI * 0.9:
+		side = -1.0 if steer >= 0.0 else 1.0
+	return h.rotated(n, side * step).normalized()
+
+
+## Tightest carve radius (m) at [param speed] with [param tuck_amount]: the
+## wider of what full lean gives and what the wheels' grip can hold.
+static func tightest_radius(t: SkaterTuning, speed: float, tuck_amount: float) -> float:
+	var v: float = maxf(absf(speed), 0.01)
+	var lean_r: float = v / maxf(carve_turn_rate(t, v, lean_limit(t, tuck_amount)), 0.001)
+	var grip_r: float = v * v / (side_grip_at(t, v) * t.gravity)
+	return maxf(lean_r, grip_r)
+
+
+## Phase (0..1) a stride starts at when you first press forward: part way into
+## the push, so the first push bites at once instead of easing in.
+static func stride_start_phase(t: SkaterTuning) -> float:
+	return t.stride_push_share * t.stride_start_share
 
 
 ## True when a floor normal [param new_n] differs from the ground the
@@ -216,17 +261,26 @@ static func pop_speed(t: SkaterTuning, charge: float) -> float:
 
 
 ## Judges a landing. Returns a Dictionary with:
-## "ok" (bool), "reason" (String), "angle_deg" (float), "impact" (float).
+## "ok" (bool), "reason" (String), "angle_deg" (float: off the nearer of
+## forwards or backwards), "impact" (float), "fakie" (bool: landed backwards).
 static func judge_landing(t: SkaterTuning, heading: Vector3, velocity: Vector3, normal: Vector3) -> Dictionary:
 	var impact: float = -velocity.dot(normal)
 	var tangential: Vector3 = project_on_plane(velocity, normal)
 	var angle_deg: float = 0.0
+	var fakie: bool = false
 	if tangential.length() > t.crash_land_angle_min_speed:
 		var h: Vector3 = project_on_plane(heading, normal)
 		if h.length() > 0.01:
-			angle_deg = rad_to_deg(h.normalized().angle_to(tangential.normalized()))
+			var raw: float = rad_to_deg(h.normalized().angle_to(tangential.normalized()))
+			# Backwards is as good as forwards on inline skates: measure how far
+			# off whichever line (toes or heels first) the skates are nearer.
+			fakie = raw > 90.0
+			angle_deg = 180.0 - raw if fakie else raw
+	var out: Dictionary = {"ok": true, "reason": "", "angle_deg": angle_deg, "impact": impact, "fakie": fakie}
 	if impact > t.crash_land_impact:
-		return {"ok": false, "reason": "Landed too hard", "angle_deg": angle_deg, "impact": impact}
-	if angle_deg > t.crash_land_angle_deg:
-		return {"ok": false, "reason": "Landed sideways", "angle_deg": angle_deg, "impact": impact}
-	return {"ok": true, "reason": "", "angle_deg": angle_deg, "impact": impact}
+		out["ok"] = false
+		out["reason"] = "Landed too hard"
+	elif angle_deg > t.crash_land_angle_deg:
+		out["ok"] = false
+		out["reason"] = "Landed sideways"
+	return out

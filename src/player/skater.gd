@@ -55,6 +55,10 @@ var sliding: bool = false
 var t_stopping: bool = false
 ## Body lean onto the edges in radians, positive = leaning right.
 var lean: float = 0.0
+## True while rolling backwards (toward the heels).
+var fakie: bool = false
+## True during the mohawk step from fakie back to forwards.
+var turning_around: bool = false
 var jump_charge: float = 0.0
 var air_time: float = 0.0
 var crash_reason: String = ""
@@ -79,6 +83,8 @@ var _takeoff_spin: float = 0.0
 var _last_steer: float = 0.0
 var _curve_load: float = 0.0
 var _prev_n: Vector3 = Vector3.UP
+var _was_striding: bool = false
+var _turn_side: float = 1.0
 
 var _visual: Node3D
 var _body_pivot: Node3D
@@ -98,6 +104,9 @@ func _ready() -> void:
 	slide_on_ceiling = false
 	max_slides = 6
 	_build_body()
+	var guide := CarveGuide.new()
+	guide.name = "CarveGuide"
+	add_child(guide)
 	var audio := SkateAudio.new()
 	audio.name = "SkateAudio"
 	audio.skater = self
@@ -123,6 +132,8 @@ func respawn() -> void:
 	_charging = false
 	_hop_buffer = 0.0
 	lean = 0.0
+	fakie = false
+	turning_around = false
 	striding = false
 	sliding = false
 	t_stopping = false
@@ -141,6 +152,11 @@ func respawn() -> void:
 ## Current speed in m/s.
 func get_speed() -> float:
 	return velocity.length()
+
+
+## Current carve turn rate (rad/s, positive = turning right).
+func turn_rate() -> float:
+	return _turn_rate
 
 
 func _physics_process(dt: float) -> void:
@@ -247,7 +263,17 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var fwd_in: float = inp["forward"]
 	var brake_in: float = inp["brake"]
 	var braking: bool = brake_in > 0.05
-	tucking = fwd_in > 0.1 and not braking and not SkateMath.prefer_stride(t, speed, tucking)
+	fakie = SkateMath.is_fakie(t, heading, velocity)
+	# Rolling backwards, forward means turn round to face where you're going:
+	# open the hips and step the skates round (a mohawk). Speed carries on.
+	if fakie and fwd_in > 0.1 and not braking and not turning_around:
+		turning_around = true
+		# Commit to one way round, picked by the steer as you start.
+		_turn_side = 1.0 if float(inp["steer"]) >= 0.0 else -1.0
+	if turning_around:
+		_turnaround_step(dt, inp, speed)
+		return
+	tucking = fwd_in > 0.1 and not braking and not fakie and not SkateMath.prefer_stride(t, speed, tucking)
 	var prev_tuck: float = tuck_amount
 	tuck_amount = SkateMath.step_tuck(t, tuck_amount, tucking, dt)
 	striding = fwd_in > 0.1 and not tucking and not braking and tuck_amount < 0.3
@@ -288,6 +314,9 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	var pumped: float = SkateMath.pump_speed(t, absf(v_f), tuck_amount - prev_tuck, _curve_load)
 	v_f = pumped * (1.0 if v_f >= 0.0 else -1.0)
 
+	if striding and not _was_striding:
+		_stride_phase = SkateMath.stride_start_phase(t)
+	_was_striding = striding
 	if striding:
 		v_f += SkateMath.stride_accel(t, maxf(v_f, 0.0), _stride_phase) * fwd_in * dt
 		_stride_phase += dt / t.stride_period
@@ -302,6 +331,36 @@ func _ground_step(dt: float, inp: Dictionary) -> void:
 	v_f = SkateMath.apply_resistance(t, v_f, SkateMath.drag_for(t, tuck_amount), dt)
 
 	velocity = heading * v_f + right * v_l
+
+
+## The mohawk step from fakie to forwards: the skates swing round toward the
+## travel direction while the body's speed carries on along it.
+func _turnaround_step(dt: float, inp: Dictionary, speed: float) -> void:
+	var t: SkaterTuning = tuning
+	var n: Vector3 = ground_normal
+	tucking = false
+	striding = false
+	_was_striding = false
+	sliding = false
+	t_stopping = false
+	grip_usage = 0.0
+	slip_speed = 0.0
+	_turn_rate = 0.0
+	tuck_amount = SkateMath.step_tuck(t, tuck_amount, false, dt)
+	lean = move_toward(lean, 0.0, deg_to_rad(t.lean_rate_deg) * dt)
+	velocity += SkateMath.project_on_plane(Vector3.DOWN * t.gravity, n) * dt
+	velocity = SkateMath.project_on_plane(velocity, n)
+	var sp: float = velocity.length()
+	if sp < t.fakie_min_speed:
+		turning_around = false
+		return
+	var travel: Vector3 = velocity / sp
+	heading = SkateMath.step_turnaround(t, heading, travel, n, _turn_side, dt)
+	velocity = travel * SkateMath.apply_resistance(t, sp, t.drag, dt)
+	if heading.angle_to(travel) < 0.01:
+		heading = travel
+		turning_around = false
+		fakie = false
 
 
 func _air_step(dt: float, inp: Dictionary) -> void:
@@ -451,7 +510,7 @@ func _update_visual(dt: float, _inp: Dictionary) -> void:
 		return
 	var target := Basis.looking_at(fwd.normalized(), up)
 	# Lean into the carve by the angle the turn really needs: atan(lateral g).
-	var a_lat: float = velocity.length() * _turn_rate
+	var a_lat: float = velocity.length() * _turn_rate * (-1.0 if fakie else 1.0)
 	var body_lean: float = atan(a_lat / tuning.gravity) if state == State.GROUNDED else lean
 	_steer_smoothed = lerpf(_steer_smoothed, body_lean, 1.0 - exp(-12.0 * dt))
 	target = target * Basis(Vector3.FORWARD, _steer_smoothed)

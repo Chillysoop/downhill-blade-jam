@@ -1,0 +1,9 @@
+Reviewed-Content-Hash: src/player/skate_math.gd 6bc3cad686cba2a408b5f7575d2131e44b07e69e
+Reviewed-Content-Hash: src/player/skater.gd b7aed4c6deba78115d4267cd808f94598c71dd99
+Reviewed-Content-Hash: src/player/skater_tuning.gd 3c0a76e070db4bb74f28912a87d8944c317783f7
+Reviewed-Content-Hash: src/player/carve_guide.gd 297400c4cf0b97171bad92a2d9f981c95a69ec88
+Reviewed-Content-Hash: src/ui/carve_meter.gd 8ec6ddd34c4d735237530d739b590e20145c067a
+Reviewed-Content-Hash: src/ui/hud.gd 2b5b8d361bac4c1ed1a1ad80656af72515ca2b44
+Reviewed-Content-Hash: tests/unit/skater/test_skate_math.gd 726877fb9a87ff976d278d32d9e822a4676a3d2b
+Reviewed-Content-Hash: tests/unit/ui/test_hud_readouts.gd fade3b66a2452327f14906c0c1b74fdc919fc6b9
+Reviewed-Content-Hash: tests/integration/skater/test_skater_fakie.gd 824f44b4f6546ac079c2c477ecc63220bed5769c

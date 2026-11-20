@@ -21,14 +21,16 @@
 6. A chase camera that keeps up at high speed and lets you read the slope ahead.
 
 ## Controls — simple and intuitive
-- **Steer:** left stick / A-D. You lean onto your edges and carve: the faster you go the wider the arc, and sharper carves scrub a little speed. Turning never adds speed.
-- **Push / tuck:** hold a trigger / W. You skate stride after stride for as long as a push still adds more speed than tucking would (pushes are quick off the line, about 20 km/h in two seconds, and keep helping up to about 60 km/h, so you hold ~45 km/h on flats); once gravity is doing the work you tuck for less drag and gentler (but still real) carves. Standing up out of a tuck takes half a second.
+- **Steer:** left stick / A-D. You lean onto your edges and carve: the faster you go the wider the arc, and sharper carves scrub a little speed. Turning never adds speed. Slow, your feet are nimble: a 180 on the spot takes about half a second and you can turn in under a metre at a jog. A faint line on the ground shows the tightest carve you can make each way at your speed, with your current arc in green (red when the wheels are sliding), and a see-through dial at the bottom shows your lean against where the grip runs out.
+- **Push / tuck:** hold a trigger / W. You skate stride after stride for as long as a push still adds more speed than tucking would (pushes bite the moment you press, are quick off the line, about 12 mph in two seconds, and keep helping up to about 37 mph, so you hold ~28 mph on flats); once gravity is doing the work you tuck for less drag and gentler (but still real) carves. Standing up out of a tuck takes half a second.
 - **Brake:** hold a trigger / S. When slow, a T-stop: one skate dragged crosswise behind the other. When fast, the reverse: the crosswise skate goes in front and bites harder. Real stopping distances.
 - **Jump:** hold to crouch, release to pop. A longer hold gives a bigger pop. A quick tap is a small hop.
 - **Hop combos:** hops are cheap and quick on blades. Releasing jump just before you land pops again the moment you touch down, so hops chain. Well-timed hops up step-ups, curbs and off the tops of rollers are a core speedrun skill.
 - **Grind:** jump onto a rail or ledge and you lock on automatically. Jump again to leave it.
-- **Air:** spin comes from the ground, as in real skating. Leave the ground mid-carve and you keep turning; hold steer as you release a charged jump to wind up a spin. In the air, steering only nudges the spin a little to line up the landing. Landing far off line at speed is a bail; at jogging pace you just step around. No trick buttons.
+- **Air:** spin comes from the ground, as in real skating. Leave the ground mid-carve and you keep turning; hold steer as you release a charged jump to wind up a spin. In the air, steering only nudges the spin a little to line up the landing. Landing backwards is fine: you roll away fakie (steering still turns you the way you're travelling). Landing far off both forwards and backwards at speed is a bail; at jogging pace you just step around. No trick buttons.
 - **Pump:** stand up out of the tuck (let go of W) as you drop into a dip or bank, and tuck (W) as you go over the crest, to gain speed without pushing. Mistimed, it costs speed.
+- **Fakie:** rolling backwards, press push / W to turn round: you step the skates round to face forwards in about a third of a second and keep your speed (steer picks which way you open up).
+- **Speed readout:** mph.
 - **Restart:** one button, any time.
 
 ## Out of scope — not building this
